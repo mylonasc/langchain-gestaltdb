@@ -101,9 +101,10 @@ jobs:
           VERSION: ${{ inputs.version }}
           PYTHON: ${{ matrix.python }}
         run: |
-          for attempt in 1 2 3 4 5; do
+          # PyPI edge caches may retain a first-release JSON 404 for minutes.
+          for attempt in {1..21}; do
             if python3 scripts/release.py verify-pypi "$VERSION"; then break; fi
-            if [ "$attempt" = 5 ]; then exit 1; fi
+            if [ "$attempt" = 21 ]; then exit 1; fi
             sleep 15
           done
           uv venv --python "$PYTHON" "$RUNNER_TEMP/released-env"
