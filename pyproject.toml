@@ -35,8 +35,11 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["langchain_gestaltdb"]
+# Twine 6's metadata parser does not yet accept Hatchling's 2.5 default.
+core-metadata-version = "2.4"
 
 [tool.hatch.build.targets.sdist]
+core-metadata-version = "2.4"
 include = ["/langchain_gestaltdb", "/tests", "/README.md", "/LICENSE", "/pyproject.toml"]
 
 [tool.pytest.ini_options]

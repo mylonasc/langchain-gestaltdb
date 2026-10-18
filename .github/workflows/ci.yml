@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.21"
+          enable-cache: true
+      - run: uv sync --python 3.12 --locked --group dev --extra lmdb
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked mypy
+
+  tests:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.21"
+          enable-cache: true
+      - run: uv sync --python '${{ matrix.python }}' --locked --group dev --extra lmdb
+      - run: uv run --locked pytest --cov=langchain_gestaltdb --cov-report=term-missing
+
+  minimum-dependencies:
+    name: Minimum direct dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.21"
+          enable-cache: true
+      # Deliberately re-resolve in the disposable runner, not against uv.lock.
+      - run: uv sync --python 3.10 --group dev --extra lmdb --resolution lowest-direct
+      - run: uv run --frozen pytest
+
+  distribution:
+    name: Installed wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.21"
+          enable-cache: true
+      - run: uv sync --python 3.12 --locked --group dev --extra lmdb
+      - run: uv build --no-sources
+      - run: uv run --locked twine check dist/*
+      - name: Test installed wheel outside the checkout
+        shell: bash
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/wheel-env"
+          wheel=$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          uv pip install --python "$RUNNER_TEMP/wheel-env/bin/python" "${wheel}[lmdb]" 'pytest>=8,<10'
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wheel-env/bin/python" -c 'import langchain_gestaltdb; assert "site-packages" in langchain_gestaltdb.__file__'
+          "$RUNNER_TEMP/wheel-env/bin/python" -m pytest "$GITHUB_WORKSPACE/tests" -c "$GITHUB_WORKSPACE/pyproject.toml"
+
+  gate:
+    name: CI gate
+    if: always()
+    needs: [quality, tests, minimum-dependencies, distribution]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          results = json.loads(os.environ["RESULTS"])
+          failed = [name for name, job in results.items() if job["result"] != "success"]
+          if failed:
+              raise SystemExit(f"Required CI jobs did not succeed: {failed}")
+          PY
