@@ -7,7 +7,8 @@ import langchain_gestaltdb
 
 def test_package_is_importable() -> None:
     assert langchain_gestaltdb.__doc__
-    assert metadata.version("langchain-gestaltdb") == "0.1.0.dev0"
+    assert metadata.version("langchain-gestaltdb")
+    assert metadata.metadata("langchain-gestaltdb")["License-Expression"] == "Apache-2.0"
 
 
 def test_typing_marker_is_packaged() -> None:
