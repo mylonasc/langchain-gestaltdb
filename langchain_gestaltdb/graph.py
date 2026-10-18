@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -11,6 +11,7 @@ from typing import Any
 from gestaltdb.graphdb import GraphDB
 
 from langchain_gestaltdb._ingestion import ingest
+from langchain_gestaltdb._read_only import validate_read_only
 from langchain_gestaltdb._schema import discover_schema
 from langchain_gestaltdb._serialization import normalize
 
@@ -90,6 +91,24 @@ class GestaltDBGraph:
             if self._owns_graph:
                 self._graph.close()
             self._closed = True
+
+    def query_read_only(
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
+        *,
+        allowed_procedures: Collection[str] = (),
+        read_snapshot: bool | None = None,
+    ) -> list[dict[str, Any]]:
+        """Validate parsed Cypher recursively before executing any database code.
+
+        Read-only means write prevention, not a computational budget. Only
+        pg.sample_typed_paths/kg.entails can be explicitly allowlisted; both
+        may be expensive. Query text is limited to 10000 characters.
+        """
+        _ = self.graph
+        validate_read_only(query, allowed_procedures)
+        return self.query(query, params, read_snapshot=read_snapshot)
 
     @property
     def get_structured_schema(self) -> dict[str, Any]:
