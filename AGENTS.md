@@ -4,7 +4,7 @@
 
 This is `langchain-gestaltdb`, not the GestaltDB database implementation.
 Read `PROJECT_BOOTSTRAP_EPIC.md` and the linked issue before changing behavior.
-The bootstrap package does not yet expose adapters, tools, or retrievers.
+The graph adapter is implemented incrementally; consult public exports and tests.
 Do not implement unrelated roadmap items or modify upstream database internals
 without authorization. Preserve the existing Apache-2.0 license.
 
@@ -44,6 +44,14 @@ Cypher-visible graph edges. Never promise atomicity/snapshots across all backend
   merged branch. Agents must not merge PRs without explicit authorization.
 - Update epic checkboxes and issue acceptance criteria when work is merged,
   not merely when local code exists. Keep dependency links bidirectional.
+
+## Technical debt
+
+Use `TECH_DEBT.md` and the GitHub `tech-debt` issue template for worthwhile work
+that must wait. Allocate stable `TD-NN` IDs; record impact, owner, safe workaround,
+reason for deferral, revisit trigger, introducing PR, and testable exit criteria.
+Review debt during BST-08 and dependency upgrades. Never defer security,
+data-integrity requirements, or failing required tests as technical debt.
 
 ## CI and local validation
 

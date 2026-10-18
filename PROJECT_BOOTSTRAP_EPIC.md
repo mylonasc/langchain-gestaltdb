@@ -93,8 +93,8 @@ Check a checkpoint only after acceptance criteria pass **and its PR is merged**.
 Bootstrap files can exist on an open PR while BST-01/BST-02 remain unchecked.
 The linked issues contain the full acceptance checklists and reverse links.
 
-- [ ] **BST-01 / P0 — Package foundation** — [#2](https://github.com/mylonasc/langchain-gestaltdb/issues/2). No blockers. Selective scaffold, modern metadata, explicit extras, lockfile, `py.typed`, wheel/sdist, real LMDB persistence and import tests.
-- [ ] **BST-02 / P0 — CI and protected PR policy** — [#3](https://github.com/mylonasc/langchain-gestaltdb/issues/3). Blocked by **BST-01**. Python matrix, quality/typing, minimum-direct dependencies, installed-wheel checks, required stable gate, protected main, contributor/release instructions.
+- [x] **BST-01 / P0 — Package foundation** — [#2](https://github.com/mylonasc/langchain-gestaltdb/issues/2). Merged in PR #14. Selective scaffold, modern metadata, explicit extras, lockfile, `py.typed`, wheel/sdist, real LMDB persistence and import tests.
+- [x] **BST-02 / P0 — CI and protected PR policy** — [#3](https://github.com/mylonasc/langchain-gestaltdb/issues/3). Merged in PR #14. Python matrix, quality/typing, minimum-direct dependencies, installed-wheel checks, required stable gate, protected main, contributor/release instructions.
 - [ ] **BST-03 / P0 — Graph lifecycle/query adapter** — [#4](https://github.com/mylonasc/langchain-gestaltdb/issues/4). Blocked by **BST-01**. `GestaltDBGraph`, parameterized record output, explicit create/open, owned/borrowed handles, deterministic nested entity/ID/temporal normalization.
 - [ ] **BST-04 / P0 — Schema and dialect** — [#5](https://github.com/mylonasc/langchain-gestaltdb/issues/5). Blocked by **BST-03**. Text/structured schema, refresh/cache contract, bounded inspection, explicit overrides, supported-Cypher guidance.
 - [ ] **BST-05 / P0 — Graph-document ingestion** — [#6](https://github.com/mylonasc/langchain-gestaltdb/issues/6). Blocked by **BST-03**. Native labels/types, collision-safe identity, defined upserts and parallel edges, source documents/MENTIONS, optional external type compatibility.
@@ -147,7 +147,7 @@ Main protection is configured remotely with strict status checks bound to the
 GitHub Actions app, administrator enforcement, PRs, resolved conversations,
 linear history, and disabled force-push/deletion. Squash is the only enabled
 merge method, and merged branches are automatically deleted. The initial
-PR and all issue checkpoints remain open for maintainer review and merge.
+PR was merged after green CI under the maintainer's explicit merge authorization.
 
 ## CI, branch, and PR contract
 
@@ -161,7 +161,13 @@ See [AGENTS.md](AGENTS.md) for the operational instructions. In brief:
 - Required CI: lint/format/typing; Python 3.10–3.13 tests; minimum direct runtime
   dependencies; build/metadata validation and wheel-installed tests outside checkout.
 - No path filters, publishing credentials, paid APIs, or `pull_request_target`.
-- Bootstrap PR stays open for maintainer review/merge; issues stay open until merged.
+- PRs merge only after green CI and authorization; issues stay open until merged.
+
+## Technical debt
+
+See [TECH_DEBT.md](TECH_DEBT.md) for stable TD IDs, linked follow-up issues,
+safe interim approaches, and measurable exit criteria. Review it during BST-08.
+Security, data-integrity, and required-test failures are not deferrable debt.
 
 ## Deferred, not implied by this epic
 

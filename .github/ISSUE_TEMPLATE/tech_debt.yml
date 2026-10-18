@@ -1,0 +1,29 @@
+name: Technical debt
+description: Record a safely deferred improvement with an explicit exit criterion.
+title: "[TD-NN] "
+labels: [tech-debt]
+body:
+  - type: markdown
+    attributes:
+      value: "Allocate the next ID from TECH_DEBT.md. Security/data-integrity blockers must not be deferred."
+  - type: textarea
+    id: scope
+    attributes:
+      label: Affected area and impact
+      description: Include the introducing issue/PR, severity, and maintainer owner.
+    validations:
+      required: true
+  - type: textarea
+    id: deferral
+    attributes:
+      label: Why defer and what is the safe interim approach?
+      description: Explain how tests and documented limitations keep the first integration safe.
+    validations:
+      required: true
+  - type: textarea
+    id: exit
+    attributes:
+      label: Revisit trigger and exit criteria
+      description: State measurable completion criteria and when this must be reconsidered.
+    validations:
+      required: true

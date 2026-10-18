@@ -1,1 +1,5 @@
-"""LangChain integration for GestaltDB (bootstrap; adapters are not implemented yet)."""
+"""Graph-first LangChain integration for GestaltDB."""
+
+from langchain_gestaltdb.graph import GestaltDBGraph
+
+__all__ = ["GestaltDBGraph"]
