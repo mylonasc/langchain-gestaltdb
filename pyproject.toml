@@ -13,6 +13,7 @@ license-files = ["LICENSE"]
 dependencies = [
     "gestaltdb>=0.12.0,<0.13",
     "langchain-core>=1.0,<2",
+    "pydantic>=2.7,<3",
 ]
 
 [project.urls]
@@ -63,3 +64,10 @@ files = ["langchain_gestaltdb"]
 [[tool.mypy.overrides]]
 module = ["gestaltdb.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# TD-01: NumPy's current stubs use 3.12 syntax; this package targets 3.10 and
+# does not expose NumPy types. Do not weaken checks for our own modules.
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true

@@ -1,8 +1,8 @@
 # langchain-gestaltdb
 
 A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
-**In development:** the lifecycle/query adapter is available; schema, ingestion,
-and tools are being implemented. See [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md)
+**In development:** the graph adapter, schema, and ingestion are available;
+agent tools are being implemented. See [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md)
 and the [technical debt register](TECH_DEBT.md).
 
 ```python
@@ -34,6 +34,43 @@ For different bounds, wrap the database with
 key order, is not representative, and is not a coherent concurrent snapshot.
 The schema includes truncation, property types, endpoint labels, index definitions,
 and GestaltDB dialect guidance. It does not enforce a closed-world schema.
+
+### Graph-document ingestion
+
+```python
+from langchain_core.documents import Document
+from langchain_gestaltdb import GraphDocument, GraphNode, GraphRelationship
+
+alice = GraphNode(id="alice", type="Person", properties={"name": "Alice"})
+bob = GraphNode(id="bob", type="Person", properties={"name": "Bob"})
+document = GraphDocument(
+    nodes=[alice, bob],
+    relationships=[GraphRelationship(source=alice, target=bob, type="KNOWS")],
+    source=Document(page_content="Alice knows Bob", metadata={"path": "example.txt"}),
+)
+# Inside the graph context above:
+# graph.add_graph_documents([document], include_source=True)
+```
+
+Equivalent mappings/Pydantic graph models can be passed without installing
+Community or Neo4j. This is structural compatibility, not a promise to inherit
+their graph-store classes. Node labels union and incoming properties shallow-merge
+over existing properties. Ordinary string IDs are unchanged; integer IDs use
+`__lc_int__:<integer>`, and strings starting `__lc_` are escaped to a hashed
+`__lc_str__:` key, preventing integer/string/internal-source collisions.
+
+Default relationship identity hashes endpoints, type, and normalized properties:
+exact repeats collapse; distinct properties produce parallel edges. Supply
+`GraphRelationship.id` to update properties of a particular edge or preserve
+otherwise identical parallel edges. Explicit IDs cannot change endpoints/type.
+Relationship `properties['type']` must agree with the declared type if supplied.
+
+With `include_source=True`, each source becomes a `__LangChainSource__` node
+with content/metadata and outgoing `MENTIONS` links. `Document.id` controls source
+identity when supplied; otherwise content plus metadata is hashed. Sources are
+not epistemic claims. Input is prevalidated, but writes are incremental and
+**not whole-import atomic**: backend failures can leave partial data. The schema
+cache is invalidated. JSON-safe property conversion follows query normalization.
 
 ## Development
 
