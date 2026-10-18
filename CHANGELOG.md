@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.1.1] - 2026-10-18
 
 - Install `pyrex-rocksdb` by default through `gestaltdb[rocksdb]` and default
   `GestaltDBGraph.create(path)` to backend `pyrex`. Default offline examples and
@@ -9,7 +9,8 @@
   reopening continues to use the persisted manifest, with no automatic migration
   or fallback. Existing backend-specific transaction/snapshot limits still apply.
 - Add LMDB to the required cross-backend contract matrix alongside LevelDB/PyRex.
-  This change is not included in published 0.1.0; no new release is authorized.
+- Existing databases are unaffected. Applications wanting a different creation
+  backend must install its extra and continue passing an explicit `backend=`.
 
 ## [0.1.0] - 2026-10-18
 
