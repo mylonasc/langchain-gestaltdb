@@ -285,6 +285,12 @@ def test_explanation_preserves_historical_ids_and_truncation(claim_graph) -> Non
         "valid_time": VALID_TIME,
         "system_time": None,
         "truncated": False,
+        "root_version_id": None,
+        "logical_id": None,
+        "nodes": [],
+        "returned_nodes": 0,
+        "edges": [],
+        "returned_edges": 0,
     }
 
 
@@ -347,7 +353,7 @@ def test_literal_objects_are_distinct_from_entities(tmp_path: Path) -> None:
 
 def test_character_caps_bound_records(claim_graph) -> None:
     graph, derived = claim_graph
-    status = GestaltDBClaimStatusTool(graph=graph, max_chars=256)
+    status = GestaltDBClaimStatusTool(graph=graph, max_chars=1024)
     capped_status = json.loads(
         status.invoke(
             {
@@ -361,12 +367,12 @@ def test_character_caps_bound_records(claim_graph) -> None:
     assert capped_status["evidence"] == []
     assert capped_status["truncated"] is True
 
-    search = GestaltDBClaimSearchTool(graph=graph, max_chars=256)
+    search = GestaltDBClaimSearchTool(graph=graph, max_chars=1024)
     capped_search = json.loads(search.invoke({"subject": "alice", "valid_time": VALID_TIME}))
     assert capped_search["claims"] == []
     assert capped_search["truncated"] is True
 
-    explanation_tool = GestaltDBClaimExplanationTool(graph=graph, max_chars=256)
+    explanation_tool = GestaltDBClaimExplanationTool(graph=graph, max_chars=600)
     capped_explanation = json.loads(
         explanation_tool.invoke({"claim_id": derived.logical_id, "valid_time": VALID_TIME})
     )
@@ -441,7 +447,7 @@ def test_errors_are_redacted(claim_graph) -> None:
     invalid = search.invoke({"statement_id": "not-a-statement", "valid_time": VALID_TIME})
     assert "claim operation failed" in invalid
     assert "statement_id" not in invalid
-    with patch.object(graph.graph, "claim_status", side_effect=RuntimeError("/secret/path")):
+    with patch.object(graph.graph, "iter_claims_as_of", side_effect=RuntimeError("/secret/path")):
         output = GestaltDBClaimStatusTool(graph=graph).invoke(
             {
                 "subject": "alice",
@@ -470,3 +476,103 @@ def test_executable_offline_claim_example() -> None:
     assert answer["supporting_and_refuting"] == 2
     assert answer["explanation_nodes"] >= 3
     assert answer["explanation_truncated"] is False
+
+
+def test_status_uses_one_resolution_and_caps_only_evidence(claim_graph) -> None:
+    graph, _ = claim_graph
+    with (
+        patch.object(graph.graph, "iter_claims_as_of", wraps=graph.graph.iter_claims_as_of) as read,
+        patch.object(graph.graph, "claim_status", side_effect=AssertionError("second resolution")),
+    ):
+        output = json.loads(
+            GestaltDBClaimStatusTool(graph=graph, max_evidence=1).invoke(
+                {
+                    "subject": "alice",
+                    "predicate": "WORKS_FOR",
+                    "object": "acme",
+                    "valid_time": VALID_TIME,
+                }
+            )
+        )
+    assert read.call_count == 1
+    assert output["status"] == "both"
+    assert output["returned_evidence"] == 1
+    assert output["truncated"] is True
+
+
+def test_json_null_literal_status_and_search_limitation(tmp_path: Path) -> None:
+    with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
+        for value in (None, 42):
+            graph.graph.assert_claim(
+                subject="metric",
+                predicate="VALUE",
+                object=value,
+                object_kind="literal",
+                polarity="positive",
+                agent="sensor",
+                valid_from=VALID_TIME,
+            )
+        search = GestaltDBClaimSearchTool(graph=graph)
+        assert json.loads(search.invoke({"valid_time": VALID_TIME}))["returned_claims"] == 2
+        found = json.loads(
+            search.invoke(
+                {
+                    "valid_time": VALID_TIME,
+                    "object": None,
+                    "object_kind": "literal",
+                }
+            )
+        )
+        assert found["returned_claims"] == 2
+        assert (
+            json.loads(
+                GestaltDBClaimStatusTool(graph=graph).invoke(
+                    {
+                        "subject": "metric",
+                        "predicate": "VALUE",
+                        "object": None,
+                        "object_kind": "literal",
+                        "valid_time": VALID_TIME,
+                    }
+                )
+            )["status"]
+            == "supported"
+        )
+
+
+def test_complete_responses_fit_character_budget(claim_graph) -> None:
+    graph, derived = claim_graph
+    invocations = (
+        (
+            GestaltDBClaimStatusTool,
+            {
+                "subject": "alice",
+                "predicate": "WORKS_FOR",
+                "object": "acme",
+                "valid_time": VALID_TIME,
+            },
+        ),
+        (GestaltDBClaimSearchTool, {"subject": "alice", "valid_time": VALID_TIME}),
+        (GestaltDBClaimExplanationTool, {"claim_id": derived.logical_id, "valid_time": VALID_TIME}),
+    )
+    for cls, arguments in invocations:
+        for budget in (256, 1024, 4000):
+            text = cls(graph=graph, max_chars=budget).invoke(arguments)
+            assert len(text) <= budget
+            output = json.loads(text)
+            if budget <= 1024:
+                assert output["truncated"] is True
+            if "error" in output:
+                assert "metadata exceeds max_chars" in output["error"]
+
+
+def test_oversized_filter_metadata_returns_bounded_error(claim_graph) -> None:
+    graph, _ = claim_graph
+    text = GestaltDBClaimSearchTool(graph=graph, max_chars=256).invoke(
+        {
+            "subject": "界" * 100,
+            "valid_time": VALID_TIME,
+        }
+    )
+    assert len(text) <= 256
+    assert "error" in json.loads(text)

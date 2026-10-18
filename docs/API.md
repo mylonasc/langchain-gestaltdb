@@ -115,6 +115,14 @@ time, operation, payload hash and provenance. As with query output, caps bound
 returned JSON, not execution time, intermediate memory, or materialization.
 Tool-facing claim errors are redacted to a single generic message.
 
+Status is computed from the same resolved claim versions as its evidence, before
+output truncation. Character caps include the whole envelope; metadata that
+cannot fit yields a bounded JSON `error` with `truncated: true`. Explanation
+responses have the same keys whether found or missing (null identities and empty
+lists for missing claims). Search treats omitted or null `object` as any object;
+null-literal lookup is available through status instead. A search without indexed
+filters scans the full catalog, regardless of the output cap.
+
 ## Tested platform and non-goals
 
 CI exercises Python 3.10–3.13/LMDB, minimum and latest direct dependencies,

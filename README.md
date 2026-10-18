@@ -138,8 +138,16 @@ filters plus valid time and system time (or `through_commit`) are supported.
 Explanations preserve historical version/logical ids and explicit truncation
 metadata. Only filters and times are agent inputs: the graph, caps
 (`max_evidence`, `max_claims`, `max_depth`, `max_nodes`, `max_edges`,
-`max_chars`) and horizons are application-controlled. Output caps bound returned
+`max_chars`) are application-controlled. Output caps bound returned
 JSON, not execution time or memory.
+
+Status and evidence use one claim resolution; the status is computed before
+evidence truncation. `max_chars` includes the complete response envelope. If
+metadata alone cannot fit, the tool returns a bounded JSON `error` with
+`truncated: true` instead of silently clipping identities or times.
+Search treats omitted or null `object` as any object; null-literal filtering is
+not exposed by search (use status for a specific null-literal statement).
+Omitting every indexed filter scans the full claim catalog.
 
 ## Development
 
