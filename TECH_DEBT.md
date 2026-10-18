@@ -31,6 +31,8 @@ stay in `PROJECT_BOOTSTRAP_EPIC.md` instead.
 - Exit: upstream typing or narrow maintained stubs adopted; remove the override
   and pass strict mypy and integration tests.
 - Introduced with: BST-03 graph adapter PR (linked in #15).
+- Introduction: [PR #17](https://github.com/mylonasc/langchain-gestaltdb/pull/17),
+  NumPy-stub follow-up in [PR #19](https://github.com/mylonasc/langchain-gestaltdb/pull/19).
 
 ### TD-02 — JSON bulk edge writes / P2 / open
 
@@ -46,7 +48,7 @@ stay in `PROJECT_BOOTSTRAP_EPIC.md` instead.
 - Exit: verify an upstream fix, test JSON bulk writes across supported backends,
   then benchmark before adopting the optimized path.
 - Discovered during: BST-03 installed-release probes; regression coverage belongs
-  with BST-05 ingestion. Related PR linked in #16.
+  with BST-05 ingestion, merged in [PR #19](https://github.com/mylonasc/langchain-gestaltdb/pull/19).
 
 ### TD-03 — AST policy coupling / P2 / open
 
@@ -60,6 +62,7 @@ stay in `PROJECT_BOOTSTRAP_EPIC.md` instead.
 - Owner: integration maintainers. Revisit on every GestaltDB upgrade.
 - Exit: verify a public upstream classifier against the adversarial suite before
   replacing the isolated adapter. Write prevention itself is not deferred.
+- Introduction: [PR #21](https://github.com/mylonasc/langchain-gestaltdb/pull/21).
 
 ### TD-04 — Cancellable execution budgets / P1 / open
 
@@ -74,4 +77,11 @@ stay in `PROJECT_BOOTSTRAP_EPIC.md` instead.
 - Owner: integration maintainers. Revisit before hosted/adversarial deployments.
 - Exit: cooperative cancellation or a process-isolated mode, with tested budget
   exhaustion, handle cleanup, persistent integrity, and measured limits.
-- Introducing documentation: BST-08 readiness PR (linked in #23).
+- Introduction: [PR #24](https://github.com/mylonasc/langchain-gestaltdb/pull/24).
+
+## BST-08 review
+
+All four entries were reviewed at first-integration readiness (PR #24). The
+interim approaches are tested or explicitly documented unsupported deployment
+capabilities, not waivers of required behavior. Revisit TD-01/TD-02/TD-03 during
+database upgrades and TD-04 before hostile or hosted multitenant deployments.

@@ -100,7 +100,7 @@ The linked issues contain the full acceptance checklists and reverse links.
 - [x] **BST-05 / P0 — Graph-document ingestion** — [#6](https://github.com/mylonasc/langchain-gestaltdb/issues/6). Merged in PR #19. Native labels/types, collision-safe identity, defined upserts and parallel edges, source documents/MENTIONS, optional external type compatibility.
 - [x] **BST-06 / P0 — Read-only security boundary** — [#7](https://github.com/mylonasc/langchain-gestaltdb/issues/7). Merged in PR #21. Recursive parsed-query validation, procedure allowlist, mutation/DDL rejection, adversarial state-unchanged tests. Public-classifier follow-up tracked as TD-03.
 - [x] **BST-07 / P0 — Agent tools/toolkit** — [#8](https://github.com/mylonasc/langchain-gestaltdb/issues/8). Merged in PR #22. `GestaltDBSchemaTool`, `GestaltDBQueryTool`, `GestaltDBToolkit`, typed inputs, parameters, bounded output, read-only defaults, explicit write opt-in, offline invocation/standard tests.
-- [ ] **BST-08 / P0 — First-release readiness** — [#9](https://github.com/mylonasc/langchain-gestaltdb/issues/9). Blocked by **BST-02, BST-04, BST-05, BST-07**. End-to-end ingest/inspect/query example, minimum/latest dependency and optional-backend coverage, source provenance, lifecycle/serialization/stale-index regressions, accurate docs. No publishing authorization.
+- [x] **BST-08 / P0 — First-release readiness** — [#9](https://github.com/mylonasc/langchain-gestaltdb/issues/9). Merged in PR #24. End-to-end ingest/inspect/query example, minimum/latest dependency and optional-backend coverage, source provenance, lifecycle/serialization/stale-index regressions, accurate docs. No publishing authorization.
 - [ ] **BST-09 / P1 — Bounded graph retriever** — [#10](https://github.com/mylonasc/langchain-gestaltdb/issues/10). Blocked by **BST-05, BST-07, BST-08**. `BaseRetriever`, indexed or supplied seed resolution, typed traversal, hop/fanout/entity/output caps, source-linked Documents, deterministic tests. External vector search may supply seeds.
 - [ ] **BST-10 / P1 — Read-side epistemic tools** — [#11](https://github.com/mylonasc/langchain-gestaltdb/issues/11). Blocked by **BST-07, BST-08**. Claim status, source/agent/world filters, valid/system time, bounded provenance explanations, contradictory/historical evidence examples.
 - [ ] **BST-11 / P1 — Opt-in claim writes** — [#12](https://github.com/mylonasc/langchain-gestaltdb/issues/12). Blocked by **BST-10**. Sourced assertion, correction, retraction; explicit authorization; history and identity tests; never silently infer authority or confidence.
@@ -168,6 +168,26 @@ See [AGENTS.md](AGENTS.md) for the operational instructions. In brief:
 See [TECH_DEBT.md](TECH_DEBT.md) for stable TD IDs, linked follow-up issues,
 safe interim approaches, and measurable exit criteria. Review it during BST-08.
 Security, data-integrity, and required-test failures are not deferrable debt.
+
+## First-integration completion evidence
+
+BST-01–BST-08 are merged through PRs #14, #17, #18, #19, #21, #22, and #24.
+The [readiness CI run](https://github.com/mylonasc/langchain-gestaltdb/actions/runs/39129774859)
+passed all eleven checks: quality, Python 3.10–3.13, minimum/latest dependencies,
+installed wheel, LevelDB/PyRex backend contracts, and the aggregate gate.
+The suite contains 95 tests, including applicable LangChain standard tool tests,
+and measured 98.73% package statement coverage on Python 3.12 (90% required).
+
+Run `uv run --locked python examples/graph_agent.py` for the offline end-to-end
+source-linked tool-call example. See [docs/API.md](docs/API.md) for public exports,
+identity/update semantics, supported platform, and deployment limitations.
+
+Debt review: TD-01 (typed upstream boundary), TD-02 (upstream JSON bulk writes),
+TD-03 (AST classifier coupling), and TD-04 (execution budgets) have linked issues,
+safe interim approaches, owners and exit criteria in `TECH_DEBT.md`. No required
+test failure or write-prevention requirement is waived. Hostile multitenant query
+sandboxing is explicitly not provided. The version remains **0.1.0.dev0**, with
+no release tag, upload, or publishing workflow. BST-09–BST-12 remain open follow-ons.
 
 ## Deferred, not implied by this epic
 
