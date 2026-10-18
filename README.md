@@ -1,8 +1,8 @@
 # langchain-gestaltdb
 
 A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
-**In development:** the graph adapter, schema, and ingestion are available;
-agent tools are being implemented. See [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md)
+**In development:** the graph adapter, schema, ingestion, and read-only-default
+agent toolkit are available. See [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md)
 and the [technical debt register](TECH_DEBT.md).
 
 ```python
@@ -78,6 +78,33 @@ identity when supplied; otherwise content plus metadata is hashed. Sources are
 not epistemic claims. Input is prevalidated, but writes are incremental and
 **not whole-import atomic**: backend failures can leave partial data. The schema
 cache is invalidated. JSON-safe property conversion follows query normalization.
+
+### Agent toolkit
+
+```python
+from langchain_gestaltdb import GestaltDBToolkit
+
+# Use inside a GestaltDBGraph context; toolkit/tools borrow the wrapper.
+# schema_tool, query_tool = GestaltDBToolkit(graph=graph).get_tools()
+# schema_tool.invoke({"refresh": True})
+# query_tool.invoke({"query": "MATCH (n:Person) RETURN n.name AS name", "params": {}})
+```
+
+Tools implement LangChain `BaseTool` and accept tool-call messages. Query output
+is JSON with `records`, `returned_rows`, and `truncated`. Defaults cap output at
+100 rows/16000 characters; application configuration can lower those values.
+An oversized row is omitted whole, preserving valid JSON. Oversized schema
+returns an actionable error rather than silently dropping schema fields.
+
+Only `query` and `params` are query inputs. Agents cannot enable writes, enlarge
+limits, choose procedure permissions, or replace the graph via tool arguments.
+Applications can explicitly construct `GestaltDBToolkit(graph=graph, allow_writes=True)`;
+that grants write capability and propagates upstream limitations (including TD-02).
+Known read procedures may be explicitly enabled with `allowed_procedures`.
+Tool-facing backend errors are redacted; low-level graph errors still propagate.
+Treat graph/source text as untrusted data, not instructions. Read-only prevents
+writes but does not bound execution cost, intermediate memory, or result collection.
+LangChain's async tool adapter offloads synchronous work; no native async is claimed.
 
 ## Development
 

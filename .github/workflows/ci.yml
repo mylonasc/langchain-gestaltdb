@@ -79,7 +79,7 @@ jobs:
         run: |
           uv venv --python 3.12 "$RUNNER_TEMP/wheel-env"
           wheel=$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -name '*.whl' -print -quit)
-          uv pip install --python "$RUNNER_TEMP/wheel-env/bin/python" "${wheel}[lmdb]" 'pytest>=8,<10'
+          uv pip install --python "$RUNNER_TEMP/wheel-env/bin/python" "${wheel}[lmdb]" 'pytest>=8,<10' 'langchain-tests==1.0.0'
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/wheel-env/bin/python" -c 'import langchain_gestaltdb; assert "site-packages" in langchain_gestaltdb.__file__'
           "$RUNNER_TEMP/wheel-env/bin/python" -m pytest "$GITHUB_WORKSPACE/tests" -c "$GITHUB_WORKSPACE/pyproject.toml"
