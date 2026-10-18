@@ -1,4 +1,4 @@
-"""Factory for consistently configured schema/query tools."""
+"""Factories for consistently configured graph-query and claim tools."""
 
 from __future__ import annotations
 

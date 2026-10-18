@@ -15,15 +15,15 @@ Structural guarantees:
 
 from __future__ import annotations
 
-import json
 from typing import Any, Literal
 
 from gestaltdb import claim_statement_id
 from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool, ToolException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from langchain_gestaltdb._serialization import normalize
+from langchain_gestaltdb._tool_output import bounded_json
 from langchain_gestaltdb.graph import GestaltDBGraph
 
 _CLAIM_ERROR = (
@@ -93,26 +93,13 @@ def _serialize_rule_version(version: Any) -> dict[str, Any]:
 
 def _serialize_node_value(value: Any) -> Any:
     """Serialize an explanation node payload: claim version, rule or raw value."""
+    # Upstream explanation nodes carry ClaimVersion or RuleVersion payloads;
+    # retain a normalization fallback for future node kinds.
     if hasattr(value, "logical_id") and hasattr(value, "version_id"):
         return _serialize_claim_version(value)
     if hasattr(value, "rule_id") and hasattr(value, "when"):
         return _serialize_rule_version(value)
     return normalize(value)
-
-
-def _bounded_records(
-    records: list[dict[str, Any]], max_records: int, max_chars: int
-) -> tuple[list[dict[str, Any]], bool]:
-    """Keep whole records until the count or character cap is reached."""
-    kept: list[dict[str, Any]] = []
-    truncated = len(records) > max_records
-    for record in records[:max_records]:
-        kept.append(record)
-        if len(json.dumps(kept, ensure_ascii=False)) > max_chars:
-            kept.pop()
-            truncated = True
-            break
-    return kept, truncated
 
 
 class ClaimStatusInput(BaseModel):
@@ -121,7 +108,7 @@ class ClaimStatusInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     subject: str = Field(min_length=1, max_length=1024, description="Claim subject entity ID")
     predicate: str = Field(min_length=1, max_length=1024, description="Asserted predicate")
-    object: Any = Field(
+    object: JsonValue = Field(
         description="Object entity ID, or a JSON literal when object_kind='literal'"
     )
     object_kind: Literal["entity", "literal"] = Field(
@@ -146,7 +133,10 @@ class ClaimSearchInput(BaseModel):
     )
     subject: str | None = Field(default=None, max_length=1024)
     predicate: str | None = Field(default=None, max_length=1024)
-    object: Any = Field(default=None, description="Object filter; omit (null) for any object")
+    object: JsonValue = Field(
+        default=None,
+        description="Object filter; omit/null for any object. Null-literal search unavailable.",
+    )
     object_kind: Literal["entity", "literal"] | None = Field(default=None)
     agent: str | None = Field(default=None, max_length=1024)
     source: str | None = Field(default=None, max_length=1024)
@@ -217,23 +207,23 @@ class GestaltDBClaimStatusTool(_ClaimTool):
                 filters["system_time"] = system_time
             if through_commit is not None:
                 filters["through_commit"] = through_commit
-            status = graph.claim_status(
-                subject,
-                predicate,
-                object,
-                valid_time=valid_time,
-                object_kind=object_kind,
-                **filters,
-            )
             statement_id = claim_statement_id(subject, predicate, object, object_kind=object_kind)
             versions = list(
                 graph.iter_claims_as_of(valid_time=valid_time, statement_id=statement_id, **filters)
             )
-            evidence, truncated = _bounded_records(
-                [_serialize_claim_version(version) for version in versions],
-                self.max_evidence,
-                self.max_chars,
+            # Match upstream's four-valued policy, using the same resolution for
+            # status and evidence. Compute before capping contradictory evidence.
+            polarities = {_enum_value(version.claim.polarity) for version in versions}
+            status = (
+                "both"
+                if polarities == {"positive", "negative"}
+                else "supported"
+                if "positive" in polarities
+                else "refuted"
+                if "negative" in polarities
+                else "unknown"
             )
+            evidence = [_serialize_claim_version(version) for version in versions]
         except Exception:
             raise ToolException(_CLAIM_ERROR) from None
         result: dict[str, Any] = {
@@ -249,9 +239,11 @@ class GestaltDBClaimStatusTool(_ClaimTool):
             "filters": {"agent": agent, "source": source, "world": world},
             "evidence": evidence,
             "returned_evidence": len(evidence),
-            "truncated": truncated,
+            "truncated": False,
         }
-        return json.dumps(result, ensure_ascii=False)
+        return bounded_json(
+            result, (("evidence", "returned_evidence", self.max_evidence),), self.max_chars
+        )
 
 
 class GestaltDBClaimSearchTool(_ClaimTool):
@@ -262,6 +254,7 @@ class GestaltDBClaimSearchTool(_ClaimTool):
         "Search sourced claims by statement, subject, predicate, object, agent, source, "
         "world or polarity at a valid/system time. Returns bounded historical claim "
         "versions. Claims are epistemic assertions, not graph edges."
+        " Omitting all indexed filters scans the full claim catalog; output caps do not limit work."
     )
     args_schema: type[BaseModel] = ClaimSearchInput
     max_claims: int = Field(default=50, ge=1, le=1000, exclude=True)
@@ -308,17 +301,13 @@ class GestaltDBClaimSearchTool(_ClaimTool):
             if through_commit is not None:
                 kwargs["through_commit"] = through_commit
             versions = list(graph.iter_claims_as_of(**kwargs))
-            claims, truncated = _bounded_records(
-                [_serialize_claim_version(version) for version in versions],
-                self.max_claims,
-                self.max_chars,
-            )
+            claims = [_serialize_claim_version(version) for version in versions]
         except Exception:
             raise ToolException(_CLAIM_ERROR) from None
         result: dict[str, Any] = {
             "claims": claims,
             "returned_claims": len(claims),
-            "truncated": truncated,
+            "truncated": False,
             "valid_time": valid_time,
             "system_time": system_time,
             "through_commit": through_commit,
@@ -333,7 +322,9 @@ class GestaltDBClaimSearchTool(_ClaimTool):
                 "polarity": polarity,
             },
         }
-        return json.dumps(result, ensure_ascii=False)
+        return bounded_json(
+            result, (("claims", "returned_claims", self.max_claims),), self.max_chars
+        )
 
 
 class GestaltDBClaimExplanationTool(_ClaimTool):
@@ -366,15 +357,25 @@ class GestaltDBClaimExplanationTool(_ClaimTool):
                 max_nodes=self.max_nodes,
             )
             if explanation is None:
-                return json.dumps(
+                return bounded_json(
                     {
                         "found": False,
                         "claim_id": claim_id,
                         "valid_time": valid_time,
                         "system_time": system_time,
                         "truncated": False,
+                        "root_version_id": None,
+                        "logical_id": None,
+                        "nodes": [],
+                        "returned_nodes": 0,
+                        "edges": [],
+                        "returned_edges": 0,
                     },
-                    ensure_ascii=False,
+                    (
+                        ("edges", "returned_edges", self.max_edges),
+                        ("nodes", "returned_nodes", self.max_nodes),
+                    ),
+                    self.max_chars,
                 )
             nodes = [
                 {
@@ -394,9 +395,6 @@ class GestaltDBClaimExplanationTool(_ClaimTool):
                 for edge in explanation.edges
             ]
             truncated = bool(explanation.truncated)
-            if len(edges) > self.max_edges:
-                edges = edges[: self.max_edges]
-                truncated = True
         except Exception:
             raise ToolException(_CLAIM_ERROR) from None
 
@@ -415,10 +413,11 @@ class GestaltDBClaimExplanationTool(_ClaimTool):
                 "truncated": truncated,
             }
 
-        while len(json.dumps(envelope(), ensure_ascii=False)) > self.max_chars and edges:
-            edges.pop()
-            truncated = True
-        while len(json.dumps(envelope(), ensure_ascii=False)) > self.max_chars and nodes:
-            nodes.pop()
-            truncated = True
-        return json.dumps(envelope(), ensure_ascii=False)
+        return bounded_json(
+            envelope(),
+            (
+                ("edges", "returned_edges", self.max_edges),
+                ("nodes", "returned_nodes", self.max_nodes),
+            ),
+            self.max_chars,
+        )

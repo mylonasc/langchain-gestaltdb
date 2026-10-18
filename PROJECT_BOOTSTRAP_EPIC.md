@@ -100,9 +100,9 @@ The linked issues contain the full acceptance checklists and reverse links.
 - [x] **BST-05 / P0 — Graph-document ingestion** — [#6](https://github.com/mylonasc/langchain-gestaltdb/issues/6). Merged in PR #19. Native labels/types, collision-safe identity, defined upserts and parallel edges, source documents/MENTIONS, optional external type compatibility.
 - [x] **BST-06 / P0 — Read-only security boundary** — [#7](https://github.com/mylonasc/langchain-gestaltdb/issues/7). Merged in PR #21. Recursive parsed-query validation, procedure allowlist, mutation/DDL rejection, adversarial state-unchanged tests. Public-classifier follow-up tracked as TD-03.
 - [x] **BST-07 / P0 — Agent tools/toolkit** — [#8](https://github.com/mylonasc/langchain-gestaltdb/issues/8). Merged in PR #22. `GestaltDBSchemaTool`, `GestaltDBQueryTool`, `GestaltDBToolkit`, typed inputs, parameters, bounded output, read-only defaults, explicit write opt-in, offline invocation/standard tests.
-- [ ] **BST-08 / P0 — First-release readiness** — [#9](https://github.com/mylonasc/langchain-gestaltdb/issues/9). Blocked by **BST-02, BST-04, BST-05, BST-07**. End-to-end ingest/inspect/query example, minimum/latest dependency and optional-backend coverage, source provenance, lifecycle/serialization/stale-index regressions, accurate docs. No publishing authorization.
-- [ ] **BST-09 / P1 — Bounded graph retriever** — [#10](https://github.com/mylonasc/langchain-gestaltdb/issues/10). Blocked by **BST-05, BST-07, BST-08**. `BaseRetriever`, indexed or supplied seed resolution, typed traversal, hop/fanout/entity/output caps, source-linked Documents, deterministic tests. External vector search may supply seeds.
-- [ ] **BST-10 / P1 — Read-side epistemic tools** — [#11](https://github.com/mylonasc/langchain-gestaltdb/issues/11). Blocked by **BST-07, BST-08**. Claim status, source/agent/world filters, valid/system time, bounded provenance explanations, contradictory/historical evidence examples.
+- [x] **BST-08 / P0 — First-release readiness** — [#9](https://github.com/mylonasc/langchain-gestaltdb/issues/9). Merged in PR #24. End-to-end ingest/inspect/query example, minimum/latest dependency and optional-backend coverage, source provenance, lifecycle/serialization/stale-index regressions, accurate docs. No publishing authorization.
+- [x] **BST-09 / P1 — Bounded graph retriever** — [#10](https://github.com/mylonasc/langchain-gestaltdb/issues/10). Merged in PR #26. `BaseRetriever`, indexed or supplied seed resolution, typed traversal, hop/fanout/entity/output caps, source-linked Documents, deterministic tests. External vector search may supply seeds.
+- [x] **BST-10 / P1 — Read-side epistemic tools** — [#11](https://github.com/mylonasc/langchain-gestaltdb/issues/11). Merged in PR #29. Claim status, source/agent/world filters, valid/system time, bounded provenance explanations, contradictory/historical evidence examples.
 - [ ] **BST-11 / P1 — Opt-in claim writes** — [#12](https://github.com/mylonasc/langchain-gestaltdb/issues/12). Blocked by **BST-10**. Sourced assertion, correction, retraction; explicit authorization; history and identity tests; never silently infer authority or confidence.
 - [ ] **BST-12 / P2 — Release pipeline design/approval** — [#13](https://github.com/mylonasc/langchain-gestaltdb/issues/13). Blocked by **BST-08**. Maintainer-approved version/tag/trigger strategy, review maintained LangChain workflows, consider OIDC/Trusted Publishing and protected environments, artifact validation, release runbook. Implementation/publication deferred.
 
@@ -168,6 +168,40 @@ See [AGENTS.md](AGENTS.md) for the operational instructions. In brief:
 See [TECH_DEBT.md](TECH_DEBT.md) for stable TD IDs, linked follow-up issues,
 safe interim approaches, and measurable exit criteria. Review it during BST-08.
 Security, data-integrity, and required-test failures are not deferrable debt.
+
+## First-integration completion evidence
+
+BST-01–BST-08 are merged through PRs #14, #17, #18, #19, #21, #22, and #24.
+The [readiness CI run](https://github.com/mylonasc/langchain-gestaltdb/actions/runs/39129774859)
+passed all eleven checks: quality, Python 3.10–3.13, minimum/latest dependencies,
+installed wheel, LevelDB/PyRex backend contracts, and the aggregate gate.
+At that run, the suite contained 95 tests, including applicable LangChain standard
+tool tests, and measured 98.73% package statement coverage on Python 3.12 (90% required).
+
+Run `uv run --locked python examples/graph_agent.py` for the offline end-to-end
+source-linked tool-call example. See [docs/API.md](docs/API.md) for public exports,
+identity/update semantics, supported platform, and deployment limitations.
+
+Debt review: TD-01 (typed upstream boundary), TD-02 (upstream JSON bulk writes),
+TD-03 (AST classifier coupling), and TD-04 (execution budgets) have linked issues,
+safe interim approaches, owners and exit criteria in `TECH_DEBT.md`. No required
+test failure or write-prevention requirement is waived. Hostile multitenant query
+sandboxing is explicitly not provided. The version remains **0.1.0.dev0**, with
+no release tag, upload, or publishing workflow. At readiness, BST-09–BST-12 remained
+open follow-ons.
+
+## Follow-on completion evidence
+
+BST-10 claim read tools merged in [PR #29](https://github.com/mylonasc/langchain-gestaltdb/pull/29),
+followed by BST-09 retrieval in [PR #26](https://github.com/mylonasc/langchain-gestaltdb/pull/26).
+The final [retriever CI run](https://github.com/mylonasc/langchain-gestaltdb/actions/runs/39158357873)
+passed all eleven checks on `c3863a9`, including Python 3.10–3.13, minimum/latest
+dependencies, installed wheel, and LevelDB/PyRex contracts. The combined local
+suite at that commit passed 144 tests with 99.28% package coverage. Review fixes
+cover single-resolution claim status/evidence, full-envelope JSON character caps,
+explicit retrieval truncation reasons, and real deferred-ingest traversal.
+BST-11 remains unmerged; BST-12 release automation remains deferred. These merges
+do not authorize publishing or tags.
 
 ## Deferred, not implied by this epic
 

@@ -13,6 +13,8 @@ Import from `langchain_gestaltdb`:
 | `GestaltDBSchemaTool` | Cached/sampled schema and bounded refresh |
 | `GestaltDBQueryTool` | Read-only-default parameterized Cypher tool |
 | `GestaltDBToolkit` | Consistently configured schema/query tools |
+| `GestaltDBRetriever` | Bounded typed-graph `BaseRetriever` over seeds |
+| `RetrievalHop` | One typed traversal hop (edge type, direction, fanout) |
 | `GestaltDBClaimStatusTool` | Read-only four-valued claim status with bounded evidence |
 | `GestaltDBClaimSearchTool` | Read-only indexed historical claim search |
 | `GestaltDBClaimExplanationTool` | Bounded claim/rule derivation graph with truncation |
@@ -93,6 +95,43 @@ Async BaseTool invocation is a thread adapter, not native async or a thread-safe
 promise. JSON bulk relationship writes have an upstream limitation (TD-02);
 ingestion deliberately uses incremental object writes. See `TECH_DEBT.md`.
 
+## Bounded graph retrieval
+
+`GestaltDBRetriever(graph, hops=(), seed_ids=(), seed_label=None,
+seed_property=None, seed_resolver=None, max_seeds=10, max_paths=50,
+max_entities=100, max_content_chars=2000, include_sources=True,
+max_sources_per_entity=5, rng_seed=0)` is a LangChain `BaseRetriever`.
+
+- Exactly one seed strategy is required: `seed_ids`, a `seed_resolver`
+  (`Callable[[str], Sequence[str]]`, e.g. an external vector-store lookup), or the
+  indexed `seed_label` + `seed_property` pair. Indexed resolution passes the query
+  string as an exact property value and therefore needs a pre-created
+  `create_node_property_index`; non-string or fuzzy matches require a resolver.
+- `hops` is an ordered tuple of `RetrievalHop(edge_type, direction=out, sample_size=10)`.
+  `direction` is `out`/`in`/`any`; `edge_type` matches `properties['type']`.
+- Output is one `Document` per distinct entity. Metadata includes `id`, `labels`,
+  `properties`, normalized `paths` (`edge_id`, `source_id`, `target_id`,
+  `edge_type`, `direction`), `relationship_types`, `hops`, `is_seed`, `sources`
+  (`document_id` + metadata), and truncation flags. `page_content` is a deterministic
+  entity rendering plus linked source text, capped by `max_content_chars`.
+
+Caps: `len(hops) <= 8`, `1 <= sample_size <= 100`, plus `max_seeds`, `max_paths`,
+`max_entities`, and `max_sources_per_entity`. Sampled IDs are decoded from bytes;
+absent seeds are skipped and metadata stays JSON-safe. Ordering is deterministic
+(seeds first, then sorted IDs) and is **not** a relevance ranking; no database
+ordering is promised. The retriever only reads, never fabricates entities, never
+writes, and never rebuilds indexes. Typed adjacency stays usable during deferred
+edge ingest; indexed seeding fails closed on stale node-label/property indexes. Seeding
+through an external vector store does not make this package a vector store.
+
+`result_truncated` marks seed/path/entity caps across the run and is copied onto
+every document. `content_truncated` and `sources_truncated` mark per-document
+clipping; `truncated` is their union. Sampling is intentional selection, not
+flagged truncation. Setting `max_sources_per_entity=0` disables source lookup.
+Caps bound returned entities/content, not execution, intermediate memory or total
+metadata size. Indexed seed candidates are consumed incrementally, with one extra
+valid seed to detect truncation.
+
 ## Claim (epistemic) tools
 
 Claims are sourced assertions/denials in a bitemporal epistemic layer, distinct
@@ -134,6 +173,14 @@ enforced upstream: a correction whose `claim_id` does not match the superseded
 version's logical id fails closed. Write output exceeding the configured cap
 returns an actionable error.
 
+Status is computed from the same resolved claim versions as its evidence, before
+output truncation. Character caps include the whole envelope; metadata that
+cannot fit yields a bounded JSON `error` with `truncated: true`. Explanation
+responses have the same keys whether found or missing (null identities and empty
+lists for missing claims). Search treats omitted or null `object` as any object;
+null-literal lookup is available through status instead. A search without indexed
+filters scans the full catalog, regardless of the output cap.
+
 ## Tested platform and non-goals
 
 CI exercises Python 3.10–3.13/LMDB, minimum and latest direct dependencies,
@@ -141,6 +188,7 @@ installed wheels, plus LevelDB and PyRex/RocksDB contract tests on Linux/Python 
 The standard tool-suite baseline is pinned to remain compatible with Core 1.0.
 No external services/model credentials are required.
 
-Retrievers, vector stores, chat history, QA chains, native
-async, and publishing automation are not part of this first integration.
-See BST-09 onward for approved follow-on scope. This version remains unreleased.
+Vector stores, chat history, QA chains, native async, and publishing automation
+are not implemented. Bounded typed-graph retrieval (BST-09) and read-only claim
+tools (BST-10) are additive follow-ons to the first integration. See BST-11 onward
+for further approved scope. This version remains unreleased.
