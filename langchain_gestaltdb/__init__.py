@@ -1,6 +1,11 @@
 """Graph-first LangChain integration for GestaltDB."""
 
 from langchain_gestaltdb._read_only import ReadOnlyQueryError
+from langchain_gestaltdb.claim_writes import (
+    GestaltDBClaimAssertTool,
+    GestaltDBClaimCorrectTool,
+    GestaltDBClaimRetractTool,
+)
 from langchain_gestaltdb.claims import (
     GestaltDBClaimExplanationTool,
     GestaltDBClaimSearchTool,
@@ -20,7 +25,10 @@ __all__ = [
     "GraphNode",
     "GraphRelationship",
     "ReadOnlyQueryError",
+    "GestaltDBClaimAssertTool",
+    "GestaltDBClaimCorrectTool",
     "GestaltDBClaimExplanationTool",
+    "GestaltDBClaimRetractTool",
     "GestaltDBClaimSearchTool",
     "GestaltDBClaimStatusTool",
     "GestaltDBClaimToolkit",

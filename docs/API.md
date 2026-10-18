@@ -18,7 +18,10 @@ Import from `langchain_gestaltdb`:
 | `GestaltDBClaimStatusTool` | Read-only four-valued claim status with bounded evidence |
 | `GestaltDBClaimSearchTool` | Read-only indexed historical claim search |
 | `GestaltDBClaimExplanationTool` | Bounded claim/rule derivation graph with truncation |
-| `GestaltDBClaimToolkit` | Consistently configured read-only claim tools |
+| `GestaltDBClaimToolkit` | Consistently configured claim tools (read-only by default) |
+| `GestaltDBClaimAssertTool` | Opt-in append-only sourced assertion/denial |
+| `GestaltDBClaimCorrectTool` | Opt-in append-only claim correction |
+| `GestaltDBClaimRetractTool` | Opt-in append-only claim retraction |
 | `ReadOnlyQueryError` | Query could not be proven read-only |
 
 `GraphDocument.from_external(model_or_mapping)` validates equivalent fields
@@ -134,7 +137,8 @@ valid seed to detect truncation.
 Claims are sourced assertions/denials in a bitemporal epistemic layer, distinct
 from mutable graph edges: they create no current-state edges and never appear in
 Cypher matching. `GestaltDBClaimToolkit(graph=graph)` returns three read-only
-tools that call the epistemic API directly; no write path is exposed.
+tools that call the epistemic API directly; the default toolkit exposes no write
+path (writes require explicit opt-in, below).
 
 - `gestaltdb_claim_status` reports `supported`/`refuted`/`both`/`unknown` with
   bounded supporting and refuting evidence for one statement.
@@ -154,7 +158,38 @@ time, operation, payload hash and provenance. As with query output, caps bound
 returned JSON, not execution time, intermediate memory, or materialization.
 Tool-facing claim errors are redacted to a single generic message.
 
-Status is computed from the same resolved claim versions as its evidence, before
+Writing is explicitly opt-in. `GestaltDBClaimToolkit(graph=graph,
+allow_writes=True)` exposes append-only `gestaltdb_claim_assert`,
+`gestaltdb_claim_correct` and `gestaltdb_claim_retract`; the default toolkit never
+includes them, and they can also be constructed directly as the opt-in. Assertions
+require explicit `agent`, `polarity` and `valid_from`; corrections require a
+`supersedes_version_id` plus an explicit change (confidence, provenance or
+`valid_from`); retractions always require `supersedes_version_id` as well. Assertion
+provenance is required JSON (explicit `{}` allowed). Agent authority and confidence
+are never inferred. Validity strings must be timezone-aware ISO-8601 instants;
+`valid_to` requires `valid_from` and is an exclusive end strictly after the start.
+No delete path exists. Every write returns a success receipt and, when it fits, the appended version
+with fact validity (`valid`) distinct from system knowledge time (`system_time`)
+and a `supersedes_version_id` link; prior versions remain retrievable. Identity is
+enforced upstream: a correction whose `claim_id` does not match the superseded
+version's logical id fails closed. Retractions also reject unknown/mismatched
+version targets; interval-only retractions are deliberately not exposed because
+GestaltDB 0.12.0 accepts orphan targets ([upstream #111](https://github.com/mylonasc/gestaltdb/issues/111)).
+Corrections use logical IDs to avoid the Claim-object overload's ignored keyword
+arguments ([upstream #110](https://github.com/mylonasc/gestaltdb/issues/110)).
+
+Successful write output includes `written: true`, `truncated: false`, and serialized
+version fields. If the payload exceeds `max_chars` or full serialization fails,
+return a bounded success receipt with `written: true`, `version_id`, `logical_id`,
+and `truncated: true`. The commit has already happened: an output cap must never
+turn it into an apparent failure. Reconcile backend-error outcomes before retrying;
+no universal rollback, idempotency or latest-version compare-and-swap is promised.
+Supplying identities does not authenticate an agent or authorize individual
+claims; trusted application policy must govern tool exposure and inputs.
+Correction `confidence=None`/`provenance=None` mean unchanged; clearing confidence
+is not exposed. An explicit `provenance={}` replaces provenance with an empty map.
+
+Read-tool status is computed from the same resolved claim versions as its evidence, before
 output truncation. Character caps include the whole envelope; metadata that
 cannot fit yields a bounded JSON `error` with `truncated: true`. Explanation
 responses have the same keys whether found or missing (null identities and empty
@@ -171,5 +206,5 @@ No external services/model credentials are required.
 
 Vector stores, chat history, QA chains, native async, and publishing automation
 are not implemented. Bounded typed-graph retrieval (BST-09) and read-only claim
-tools (BST-10) are additive follow-ons to the first integration. See BST-11 onward
-for further approved scope. This version remains unreleased.
+tools (BST-10) and opt-in claim writes (BST-11) are additive follow-ons to the first
+integration. Publishing remains deferred to BST-12. This version remains unreleased.

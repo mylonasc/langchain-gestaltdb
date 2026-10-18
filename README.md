@@ -7,8 +7,8 @@
 
 A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
 **In development:** the graph adapter, schema, ingestion, read-only-default
-agent toolkit, bounded typed-graph retriever, and read-only claim status/provenance
-tools are available. See
+agent toolkit, bounded typed-graph retriever, read-only claim status/provenance
+tools, and explicitly enabled claim writes are available. See
 [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md) and the
 [technical debt register](TECH_DEBT.md).
 
@@ -162,7 +162,7 @@ size. Resolvers, property normalization, and source lookup may still be costly.
 GestaltDB claims are sourced assertions or denials in a bitemporal epistemic
 layer. They are **not** graph edges: they do not create current-state edges and
 never appear in Cypher results or `MATCH` patterns. `GestaltDBClaimToolkit`
-exposes read-only, bounded tools for them and exposes no write path.
+exposes read-only, bounded tools for them; writes require explicit opt-in (below).
 
 ```python
 from langchain_gestaltdb import GestaltDBClaimToolkit
@@ -187,12 +187,49 @@ metadata. Only filters and times are agent inputs: the graph, caps
 JSON, not execution time or memory.
 
 Status and evidence use one claim resolution; the status is computed before
-evidence truncation. `max_chars` includes the complete response envelope. If
-metadata alone cannot fit, the tool returns a bounded JSON `error` with
+evidence truncation. Read-tool `max_chars` includes the complete response envelope.
+If metadata alone cannot fit, the read tool returns a bounded JSON `error` with
 `truncated: true` instead of silently clipping identities or times.
 Search treats omitted or null `object` as any object; null-literal filtering is
 not exposed by search (use status for a specific null-literal statement).
 Omitting every indexed filter scans the full claim catalog.
+
+### Opt-in claim writes
+
+Writing claims is explicitly opt-in. `GestaltDBClaimToolkit(graph=graph,
+allow_writes=True)` additionally returns append-only `gestaltdb_claim_assert`,
+`gestaltdb_claim_correct` and `gestaltdb_claim_retract` tools; the default
+toolkit never exposes them. Direct construction of a write tool also opts in.
+Assertions require explicit agent, polarity, JSON provenance (`{}` if unavailable),
+and fact-validity start. Corrections and retractions require an exact
+`supersedes_version_id`; optional validity overrides use timezone-aware ISO-8601
+instants with an exclusive end after the start. Agent authority and confidence
+are never inferred. These tools grant write capability, not agent authentication
+or per-claim authorization: trusted applications must enforce those policies.
+Nothing is deleted. Fact validity (`valid`) stays separate from system knowledge
+time (`system_time`); prior versions remain retrievable with historical horizons.
+
+```python
+# write, correct and retract tools (opt-in):
+# status, search, explain, assert_tool, correct_tool, retract_tool = \
+#     GestaltDBClaimToolkit(graph=graph, allow_writes=True).get_tools()
+# assert_tool.invoke({"subject": "alice", "predicate": "WORKS_FOR", "object": "acme",
+#                     "polarity": "positive", "agent": "source:hr",
+#                     "provenance": {"document": "hr.csv"},
+#                     "valid_from": "2024-01-01T00:00:00Z"})
+# correct_tool.invoke({"claim_id": "claim:...", "supersedes_version_id": "uuid",
+#                      "confidence": 0.9})
+# retract_tool.invoke({"claim_id": "claim:...", "supersedes_version_id": "uuid",
+#                      "reason": "employment ended", "valid_from": "2024-05-01T00:00:00Z"})
+```
+
+Successful writes return JSON with `written: true` and the new version. If the
+full payload cannot fit `max_chars` (or cannot be serialized), the response is a
+compact success receipt containing `version_id`, `logical_id`, and
+`truncated: true`, not a failure. Do not retry a committed write merely because
+its payload was omitted. Backend errors are redacted and may have uncertain
+outcomes; reconcile stored state before retrying. Backend transaction guarantees
+are unchanged, and an exact version target is not a latest-version compare-and-swap.
 
 ## Development
 
@@ -206,6 +243,12 @@ Run the offline claim status/contradiction/provenance example:
 
 ```bash
 uv run --locked python examples/claim_agent.py
+```
+
+Run the offline opt-in claim-write example (fact validity vs system knowledge time):
+
+```bash
+uv run --locked python examples/claim_writes.py
 ```
 
 No model, API key, database server, or network service is required. The scripted
