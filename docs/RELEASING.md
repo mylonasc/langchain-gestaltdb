@@ -87,6 +87,29 @@ rebuild. Yanking a broken release and publishing a corrected **new version** nee
 explicit maintainer approval. If upload succeeds but post-install checks fail,
 report the release as published with failed verification, not as unpublished.
 
+For propagation-only failures after a confirmed successful upload and matching
+public hashes, rerun **failed verification jobs only** (`gh run rerun RUN_ID --failed`),
+not the full workflow or a new dispatch. The metadata check allows up to five
+minutes for cached PyPI JSON 404s; persistent absence/hash mismatches still fail.
+This was exercised on 0.1.0: the initial Python 3.12 metadata check saw cached 404s,
+and verification succeeded on attempt 2 without repeating the upload.
+
+## First-release evidence
+
+Version [0.1.0 on PyPI](https://pypi.org/project/langchain-gestaltdb/0.1.0/) and
+[GitHub Release v0.1.0](https://github.com/mylonasc/langchain-gestaltdb/releases/tag/v0.1.0)
+refer to exact main commit `6886984a64a5a8a6a656d9e5818b48d971d0c90e`.
+[Main CI](https://github.com/mylonasc/langchain-gestaltdb/actions/runs/39160676776)
+passed all eleven checks; the
+[publishing run](https://github.com/mylonasc/langchain-gestaltdb/actions/runs/39160735008)
+successfully uploaded with OIDC/attestations and verified the public wheel on
+Python 3.10–3.13 (207 tests per interpreter). CI, PyPI and GitHub assets match:
+
+```text
+1a2aa6910b16a01e84f7e7d2323c2c47ca6851d965b4892c611b3b827952d76c  langchain_gestaltdb-0.1.0-py3-none-any.whl
+e84ba7146a2213322fa624d829809fb8e160d018ae3cfe8cc5896ae98863ad0d  langchain_gestaltdb-0.1.0.tar.gz
+```
+
 ## Design references (reviewed for BST-12)
 
 - Maintained [Neo4j release workflow](https://github.com/langchain-ai/langchain-neo4j/blob/main/.github/workflows/_release.yml)

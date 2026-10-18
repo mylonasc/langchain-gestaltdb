@@ -9,9 +9,10 @@ Build a small, graph-first LangChain integration: a typed `GestaltDBGraph`
 adapter, predictable graph-document ingestion, and safe read-only agent tools.
 Follow with bounded typed-graph retrieval and provenance-aware temporal claims.
 
-The first release candidate scope is **BST-01 through BST-08**. BST-09 through
-BST-11 are follow-on features. **Publishing automation is deferred to BST-12**;
-this epic does not authorize tags, GitHub Releases, or package uploads.
+The initial first-integration scope was **BST-01 through BST-08**; BST-09 through
+BST-11 were additive follow-ons, included in the first public release **0.1.0**.
+BST-12 delivered explicitly approved Trusted Publishing. Every later release
+still needs separate maintainer authorization; a merge alone never publishes.
 
 ## Research and constraints
 
@@ -104,7 +105,7 @@ The linked issues contain the full acceptance checklists and reverse links.
 - [x] **BST-09 / P1 — Bounded graph retriever** — [#10](https://github.com/mylonasc/langchain-gestaltdb/issues/10). Merged in PR #26. `BaseRetriever`, indexed or supplied seed resolution, typed traversal, hop/fanout/entity/output caps, source-linked Documents, deterministic tests. External vector search may supply seeds.
 - [x] **BST-10 / P1 — Read-side epistemic tools** — [#11](https://github.com/mylonasc/langchain-gestaltdb/issues/11). Merged in PR #29. Claim status, source/agent/world filters, valid/system time, bounded provenance explanations, contradictory/historical evidence examples.
 - [x] **BST-11 / P1 — Opt-in claim writes** — [#12](https://github.com/mylonasc/langchain-gestaltdb/issues/12). Merged in PR #31. Sourced assertion, correction, retraction; explicit authorization; history and identity tests; never silently infer authority or confidence.
-- [ ] **BST-12 / P2 — Release pipeline design/approval** — [#13](https://github.com/mylonasc/langchain-gestaltdb/issues/13). Blocked by **BST-08**. Maintainer-approved version/tag/trigger strategy, review maintained LangChain workflows, consider OIDC/Trusted Publishing and protected environments, artifact validation, release runbook. Implementation/publication deferred.
+- [x] **BST-12 / P2 — Release pipeline design/approval** — [#13](https://github.com/mylonasc/langchain-gestaltdb/issues/13). Merged in PR #32 under explicit maintainer approval. Manual publish.yml, stable versions/vX.Y.Z tags, protected environment/OIDC, exact-main CI artifacts, attestations, release runbook and first 0.1.0 publication.
 
 ### Dependency graph
 
@@ -186,8 +187,8 @@ Debt review: TD-01 (typed upstream boundary), TD-02 (upstream JSON bulk writes),
 TD-03 (AST classifier coupling), and TD-04 (execution budgets) have linked issues,
 safe interim approaches, owners and exit criteria in `TECH_DEBT.md`. No required
 test failure or write-prevention requirement is waived. Hostile multitenant query
-sandboxing is explicitly not provided. The version remains **0.1.0.dev0**, with
-no release tag, upload, or publishing workflow. At readiness, BST-09–BST-12 remained
+sandboxing is explicitly not provided. At readiness the version was **0.1.0.dev0**,
+with no release tag, upload, or publishing workflow. At readiness, BST-09–BST-12 remained
 open follow-ons.
 
 ## Follow-on completion evidence
@@ -204,6 +205,13 @@ BST-11 subsequently merged in PR #31. The maintainer then explicitly authorized
 BST-12 implementation and the first public release, 0.1.0 including BST-11, with
 PyPI Trusted Publishing through `publish.yml`. That one-off approval does not
 authorize subsequent releases. See `docs/RELEASING.md` for the release policy.
+
+The approved **0.1.0** release is published on PyPI with tag/GitHub Release
+`v0.1.0` at commit `6886984a64a5a8a6a656d9e5818b48d971d0c90e`.
+[Publication and public-wheel verification](https://github.com/mylonasc/langchain-gestaltdb/actions/runs/39160735008)
+passed on Python 3.10–3.13; the exact artifacts and hashes are recorded in the
+release runbook. BST-01–BST-12 are complete; later roadmap or release work needs
+separate approval.
 
 ## Deferred, not implied by this epic
 

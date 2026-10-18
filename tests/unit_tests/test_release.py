@@ -159,6 +159,7 @@ def test_publish_workflow_has_only_manual_trigger_and_isolated_oidc() -> None:
     assert "name: pypi" in publish and "actions/checkout@" not in publish
     assert "uv build" not in publish and "contents: write" not in workflow
     assert "attestations: true" in publish and "skip-existing:" not in workflow
+    assert "for attempt in {1..21}" in workflow  # bounded PyPI edge-cache propagation wait
 
 
 @pytest.mark.parametrize(
