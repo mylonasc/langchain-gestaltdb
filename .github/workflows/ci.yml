@@ -68,6 +68,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - backend: lmdb
+            extra: lmdb
           - backend: leveldb
             extra: leveldb
           - backend: pyrex
@@ -124,9 +126,26 @@ jobs:
         run: |
           uv venv --python 3.12 "$RUNNER_TEMP/wheel-env"
           wheel=$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -name '*.whl' -print -quit)
-          uv pip install --python "$RUNNER_TEMP/wheel-env/bin/python" "${wheel}[lmdb]" 'pytest>=8,<10' 'langchain-tests==1.0.0'
+          uv pip install --python "$RUNNER_TEMP/wheel-env/bin/python" "$wheel" 'pytest>=8,<10' 'langchain-tests==1.0.0'
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/wheel-env/bin/python" -c 'import langchain_gestaltdb; assert "site-packages" in langchain_gestaltdb.__file__'
+          "$RUNNER_TEMP/wheel-env/bin/python" - <<'PY'
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from importlib.metadata import version
+          from langchain_gestaltdb import GestaltDBGraph
+
+          assert version("pyrex-rocksdb")
+          with TemporaryDirectory() as directory:
+              path = Path(directory) / "plain-install"
+              with GestaltDBGraph.create(path) as graph:
+                  assert graph.graph.manifest["backend"]["name"] == "pyrex"
+                  graph.query("CREATE (n:Person {id: 'alice'}) RETURN n")
+              with GestaltDBGraph.open(path) as graph:
+                  assert graph.query_read_only("MATCH (n:Person) RETURN n.id AS id") == [{"id": "alice"}]
+          PY
+          # The full suite also retains explicit LMDB snapshot/compatibility tests.
+          uv pip install --python "$RUNNER_TEMP/wheel-env/bin/python" 'gestaltdb[lmdb]>=0.12.0,<0.13'
           "$RUNNER_TEMP/wheel-env/bin/python" -m pytest "$GITHUB_WORKSPACE/tests" -c "$GITHUB_WORKSPACE/pyproject.toml"
       - name: Retain the tested main distributions for explicitly approved releases
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

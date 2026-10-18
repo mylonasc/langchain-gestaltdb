@@ -15,7 +15,7 @@ from typing import Any
 from langchain_gestaltdb import GestaltDBClaimToolkit, GestaltDBGraph
 
 
-def run_example(backend: str = "lmdb") -> dict[str, Any]:
+def run_example(backend: str = "pyrex") -> dict[str, Any]:
     """Assert, correct and retract, distinguishing validity from knowledge time."""
     with TemporaryDirectory() as directory:
         with GestaltDBGraph.create(Path(directory) / "graph", backend=backend) as graph:

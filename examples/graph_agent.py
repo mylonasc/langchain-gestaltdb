@@ -23,7 +23,7 @@ from langchain_gestaltdb import (
 )
 
 
-def run_example(backend: str = "lmdb") -> dict[str, Any]:
+def run_example(backend: str = "pyrex") -> dict[str, Any]:
     """Return an answer with source evidence, without a model or external service."""
     with TemporaryDirectory() as directory:
         person = GraphNode(id="alice", type="Person", properties={"name": "Alice"})

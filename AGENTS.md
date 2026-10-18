@@ -18,7 +18,8 @@ uv run --locked python -m gestaltdb.agent_docs search '<API name>'
 ```
 
 Import `GraphDB`, `Node`, and `Edge` from `gestaltdb.graphdb`, not the package root.
-Use explicit installed backend selection, JSON for simple fixtures, temporary
+Adapter creation defaults to installed PyRex/RocksDB; use explicit selection for
+alternative backends and never silently fall back. Use JSON for simple fixtures, temporary
 database paths, and `try/finally` to close owned handles. Claims are not ordinary
 Cypher-visible graph edges. Never promise atomicity/snapshots across all backends.
 
@@ -77,7 +78,7 @@ with no path filters that could leave the required gate pending. It includes:
 3. Fresh lowest-direct dependencies on Python 3.10 and latest dependencies on 3.12.
 4. Wheel/sdist build and metadata validation, plus wheel-installed tests outside
    the source checkout.
-5. LevelDB/PyRex contract tests on Linux/Python 3.12 with explicit native library
+5. LMDB/LevelDB/PyRex contract tests on Linux/Python 3.12 with explicit native library
    installation, plus executable offline example tests.
 6. A stable `CI gate` that fails for failed, skipped, or cancelled prerequisites.
 

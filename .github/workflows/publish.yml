@@ -111,12 +111,26 @@ jobs:
           for attempt in 1 2 3 4 5; do
             if uv pip install --python "$RUNNER_TEMP/released-env/bin/python" --no-cache \
               --index-url https://pypi.org/simple --only-binary langchain-gestaltdb \
-              "langchain-gestaltdb[lmdb]==$VERSION" 'pytest>=8,<10' 'langchain-tests==1.0.0'; then
+              "langchain-gestaltdb==$VERSION" 'pytest>=8,<10' 'langchain-tests==1.0.0'; then
               break
             fi
             if [ "$attempt" = 5 ]; then exit 1; fi
             sleep 15
           done
           cd "$RUNNER_TEMP"
-          "$RUNNER_TEMP/released-env/bin/python" -c 'import os, importlib.metadata as m, langchain_gestaltdb as g; assert m.version("langchain-gestaltdb") == os.environ["VERSION"]; assert "site-packages" in g.__file__'
+          "$RUNNER_TEMP/released-env/bin/python" - <<'PY'
+          import os
+          from importlib.metadata import version
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          import langchain_gestaltdb as g
+
+          assert version("langchain-gestaltdb") == os.environ["VERSION"]
+          assert version("pyrex-rocksdb")
+          assert "site-packages" in g.__file__
+          with TemporaryDirectory() as directory:
+              with g.GestaltDBGraph.create(Path(directory) / "default") as graph:
+                  assert graph.graph.manifest["backend"]["name"] == "pyrex"
+          PY
+          uv pip install --python "$RUNNER_TEMP/released-env/bin/python" 'gestaltdb[lmdb]>=0.12.0,<0.13'
           "$RUNNER_TEMP/released-env/bin/python" -m pytest "$GITHUB_WORKSPACE/tests" -c "$GITHUB_WORKSPACE/pyproject.toml"

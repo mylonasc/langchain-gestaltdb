@@ -11,7 +11,7 @@ requires-python = ">=3.10,<3.14"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = [
-    "gestaltdb>=0.12.0,<0.13",
+    "gestaltdb[rocksdb]>=0.12.0,<0.13",
     "langchain-core>=1.0,<2",
     "pydantic>=2.7,<3",
 ]
