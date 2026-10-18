@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from langchain_core.callbacks import CallbackManagerForToolRun
@@ -10,6 +9,7 @@ from langchain_core.tools import BaseTool, ToolException
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 from langchain_gestaltdb._read_only import ReadOnlyQueryError, validate_read_only
+from langchain_gestaltdb._tool_output import bounded_json
 from langchain_gestaltdb.graph import GestaltDBGraph
 
 
@@ -30,19 +30,11 @@ class SchemaInput(BaseModel):
 
 def _bounded_output(records: list[dict[str, Any]], max_rows: int, max_chars: int) -> str:
     result: dict[str, Any] = {
-        "records": [],
+        "records": records,
         "returned_rows": 0,
         "truncated": len(records) > max_rows,
     }
-    for row in records[:max_rows]:
-        result["records"].append(row)
-        result["returned_rows"] += 1
-        if len(json.dumps(result, ensure_ascii=False)) > max_chars:
-            result["records"].pop()
-            result["returned_rows"] -= 1
-            result["truncated"] = True
-            break
-    return json.dumps(result, ensure_ascii=False)
+    return bounded_json(result, (("records", "returned_rows", max_rows),), max_chars)
 
 
 class GestaltDBQueryTool(BaseTool):
