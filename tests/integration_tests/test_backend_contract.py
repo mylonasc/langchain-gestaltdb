@@ -22,7 +22,7 @@ from langchain_gestaltdb import (
 
 
 def test_backend_ingestion_schema_tool_and_reopen(tmp_path: Path) -> None:
-    backend = os.environ.get("GESTALTDB_TEST_BACKEND", "lmdb")
+    backend = os.environ.get("GESTALTDB_TEST_BACKEND", "pyrex")
     path = tmp_path / "graph"
     a, b = GraphNode(id="a", type="Person"), GraphNode(id="b", type="Company")
     document = GraphDocument(
@@ -69,11 +69,12 @@ def test_backend_ingestion_schema_tool_and_reopen(tmp_path: Path) -> None:
         assert [document.metadata["id"] for document in deferred] == ["b", "a"]
         assert "edge_type" in graph.graph.stale_indexes()
     with GestaltDBGraph.open(path) as reopened:
+        assert reopened.graph.manifest["backend"]["name"] == backend
         assert len(reopened.query_read_only("MATCH (n) RETURN n")) == 2
 
 
 def test_backend_claim_status_and_evidence(tmp_path: Path) -> None:
-    backend = os.environ.get("GESTALTDB_TEST_BACKEND", "lmdb")
+    backend = os.environ.get("GESTALTDB_TEST_BACKEND", "pyrex")
     with GestaltDBGraph.create(tmp_path / "claims", backend=backend) as graph:
         graph.graph.assert_claim(
             subject="alice",
@@ -102,7 +103,7 @@ def test_backend_claim_status_and_evidence(tmp_path: Path) -> None:
 
 
 def test_backend_claim_writes_are_append_only(tmp_path: Path) -> None:
-    backend = os.environ.get("GESTALTDB_TEST_BACKEND", "lmdb")
+    backend = os.environ.get("GESTALTDB_TEST_BACKEND", "pyrex")
     with GestaltDBGraph.create(tmp_path / "claims-write", backend=backend) as graph:
         write_tools = {
             tool.name: tool

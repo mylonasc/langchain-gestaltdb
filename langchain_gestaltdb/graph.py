@@ -49,9 +49,13 @@ class GestaltDBGraph:
 
     @classmethod
     def create(
-        cls, path: str | Path, *, backend: str, serializer: str = "json", **options: Any
+        cls, path: str | Path, *, backend: str = "pyrex", serializer: str = "json", **options: Any
     ) -> GestaltDBGraph:
-        """Create an owned manifest-backed database with explicit backend selection."""
+        """Create an owned database; default to PyRex/RocksDB, never silently fall back.
+
+        Explicit ``backend="lmdb"``/``"leveldb"`` overrides require their extras.
+        ``open`` always follows the persisted manifest, not this creation default.
+        """
         return cls(
             GraphDB.create(path, backend=backend, serializer=serializer, **options), owns_graph=True
         )

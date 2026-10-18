@@ -13,3 +13,9 @@ def test_package_is_importable() -> None:
 
 def test_typing_marker_is_packaged() -> None:
     assert resources.files("langchain_gestaltdb").joinpath("py.typed").is_file()
+
+
+def test_plain_install_declares_pyrex_backend() -> None:
+    requirements = metadata.requires("langchain-gestaltdb") or []
+    assert any(item.startswith("gestaltdb[rocksdb]") and ";" not in item for item in requirements)
+    assert metadata.version("pyrex-rocksdb")

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Install `pyrex-rocksdb` by default through `gestaltdb[rocksdb]` and default
+  `GestaltDBGraph.create(path)` to backend `pyrex`. Default offline examples and
+  plain-wheel installation checks now exercise PyRex/RocksDB.
+- Preserve explicit LMDB/LevelDB overrides and the existing `rocksdb` extra;
+  reopening continues to use the persisted manifest, with no automatic migration
+  or fallback. Existing backend-specific transaction/snapshot limits still apply.
+- Add LMDB to the required cross-backend contract matrix alongside LevelDB/PyRex.
+  This change is not included in published 0.1.0; no new release is authorized.
+
 ## [0.1.0] - 2026-10-18
 
 First public release of the Apache-2.0 LangChain integration for GestaltDB.

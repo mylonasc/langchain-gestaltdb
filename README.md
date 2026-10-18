@@ -12,16 +12,19 @@ tools, and explicitly enabled claim writes are available. See
 [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md) and the
 [technical debt register](TECH_DEBT.md).
 
-Install with an explicit embedded backend (Python 3.10–3.13):
+PyRex/RocksDB (`pyrex-rocksdb`, GestaltDB backend name `pyrex`) is the default
+in the development version: a plain install includes it and `GestaltDBGraph.create(path)`
+selects it. This default change is **not yet released**. Published 0.1.0 supports
+PyRex via the `rocksdb` extra and requires explicit backend selection:
 
 ```bash
-pip install 'langchain-gestaltdb[lmdb]==0.1.0'
+pip install 'langchain-gestaltdb[rocksdb]==0.1.0'
 ```
 
 ```python
 from langchain_gestaltdb import GestaltDBGraph
 
-with GestaltDBGraph.create("my-graph", backend="lmdb") as graph:
+with GestaltDBGraph.create("my-graph", backend="pyrex") as graph:
     rows = graph.query("MATCH (n) WHERE n.id = $id RETURN n", {"id": "alice"})
 ```
 
@@ -279,9 +282,14 @@ minimum/latest direct dependencies, real deferred-index behavior, and additional
 LevelDB/PyRex backend contracts on Linux/Python 3.12. All tests run offline and
 enforce at least 90% package coverage in the Python matrix.
 
-GestaltDB's base install has **no storage backend**. Development uses the `lmdb`
-extra and JSON serialization explicitly; `leveldb` and `rocksdb` extras are
-available for future backend coverage. There is no silent backend fallback.
+The integration installs `gestaltdb[rocksdb]` by default, bringing in
+`pyrex-rocksdb`. The upstream GestaltDB base package alone still has no backend.
+`lmdb` and `leveldb` remain optional extras and require an explicit `backend=`
+override; the existing `rocksdb` extra remains compatible. Development also
+installs `lmdb` to retain explicit LMDB snapshot/compatibility tests. Default
+examples and backend contracts exercise PyRex with JSON; no silent fallback is
+attempted. Reopening a database uses its persisted backend, so this creation
+default does not migrate or reinterpret existing LMDB/LevelDB stores.
 
 ## Agent-oriented upstream documentation
 

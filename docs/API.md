@@ -31,10 +31,15 @@ without installing Community or Neo4j. This is not inheritance/chain compatibili
 
 - `GestaltDBGraph(db, owns_graph=False, schema_node_limit=100,
   schema_edge_limit=100, schema_override=None)` wraps an existing database.
-- `GestaltDBGraph.create(path, backend=..., serializer="json", **database_options)`
-  creates an owned manifest-backed database. A backend must be installed/selected.
+- `GestaltDBGraph.create(path, backend="pyrex", serializer="json", **database_options)`
+  creates an owned manifest-backed database. The default is PyRex/RocksDB and a
+  plain installation includes `pyrex-rocksdb` through `gestaltdb[rocksdb]`.
+  Explicit `backend="lmdb"`/`"leveldb"` overrides require their optional extras;
+  missing backends fail explicitly, never fall back to a different backend.
 - `GestaltDBGraph.open(path, **database_options)` opens an owned database using
   its persisted manifest. `close()` and context management release owned handles.
+  Opening existing stores is unaffected by the creation default; no migration
+  from LMDB or LevelDB is performed.
 - `graph` accesses the raw database only while the wrapper is open.
 - `query(query, params=None, read_snapshot=None)` permits upstream reads/writes;
   backend/parser errors propagate unchanged.
@@ -199,8 +204,9 @@ filters scans the full catalog, regardless of the output cap.
 
 ## Tested platform and non-goals
 
-CI exercises Python 3.10–3.13/LMDB, minimum and latest direct dependencies,
-installed wheels, plus LevelDB and PyRex/RocksDB contract tests on Linux/Python 3.12.
+CI exercises Python 3.10–3.13 with the mandatory PyRex runtime and explicit LMDB
+compatibility/snapshot tests, minimum and latest direct dependencies,
+installed wheels, plus LMDB, LevelDB and PyRex/RocksDB contracts on Linux/Python 3.12.
 The standard tool-suite baseline is pinned to remain compatible with Core 1.0.
 No external services/model credentials are required.
 
@@ -209,3 +215,8 @@ are not implemented. Bounded typed-graph retrieval (BST-09) and read-only claim
 tools (BST-10) and opt-in claim writes (BST-11) are additive follow-ons to the first
 integration. Version 0.1.0 is the first public release; publishing requires explicit
 approval through `publish.yml`. See `RELEASING.md` and the root changelog.
+
+The PyRex plain-install/creation default is an unreleased change after 0.1.0.
+Published 0.1.0 requires `langchain-gestaltdb[rocksdb]` plus explicit
+`backend="pyrex"`; the dependency/default changes described above apply to the
+development branch until a separately approved release is published.
