@@ -8,6 +8,7 @@ import pytest
 
 from langchain_gestaltdb import (
     GestaltDBClaimStatusTool,
+    GestaltDBClaimToolkit,
     GestaltDBGraph,
     GestaltDBToolkit,
     GraphDocument,
@@ -66,3 +67,38 @@ def test_backend_claim_status_and_evidence(tmp_path: Path) -> None:
         assert output["status"] == "supported"
         assert output["evidence"][0]["claim"]["source"] == "hr.csv"
         assert graph.query_read_only("MATCH (n) RETURN n") == []
+
+
+def test_backend_claim_writes_are_append_only(tmp_path: Path) -> None:
+    backend = os.environ.get("GESTALTDB_TEST_BACKEND", "lmdb")
+    with GestaltDBGraph.create(tmp_path / "claims-write", backend=backend) as graph:
+        write_tools = {
+            tool.name: tool
+            for tool in GestaltDBClaimToolkit(graph=graph, allow_writes=True).get_tools()
+        }
+        assert len(GestaltDBClaimToolkit(graph=graph).get_tools()) == 3
+        asserted = json.loads(
+            write_tools["gestaltdb_claim_assert"].invoke(
+                {
+                    "subject": "alice",
+                    "predicate": "WORKS_FOR",
+                    "object": "acme",
+                    "polarity": "positive",
+                    "agent": "hr",
+                    "provenance": {"document": "hr.csv"},
+                    "valid_from": "2024-01-01T00:00:00Z",
+                }
+            )
+        )
+        corrected = json.loads(
+            write_tools["gestaltdb_claim_correct"].invoke(
+                {
+                    "claim_id": asserted["logical_id"],
+                    "supersedes_version_id": asserted["version_id"],
+                    "confidence": 0.9,
+                }
+            )
+        )
+        assert corrected["logical_id"] == asserted["logical_id"]
+        assert corrected["supersedes_version_id"] == asserted["version_id"]
+        assert corrected["claim"]["provenance"] == {"document": "hr.csv"}
