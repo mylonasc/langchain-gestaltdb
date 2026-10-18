@@ -13,6 +13,10 @@ Import from `langchain_gestaltdb`:
 | `GestaltDBSchemaTool` | Cached/sampled schema and bounded refresh |
 | `GestaltDBQueryTool` | Read-only-default parameterized Cypher tool |
 | `GestaltDBToolkit` | Consistently configured schema/query tools |
+| `GestaltDBClaimStatusTool` | Read-only four-valued claim status with bounded evidence |
+| `GestaltDBClaimSearchTool` | Read-only indexed historical claim search |
+| `GestaltDBClaimExplanationTool` | Bounded claim/rule derivation graph with truncation |
+| `GestaltDBClaimToolkit` | Consistently configured read-only claim tools |
 | `ReadOnlyQueryError` | Query could not be proven read-only |
 
 `GraphDocument.from_external(model_or_mapping)` validates equivalent fields
@@ -86,6 +90,31 @@ Async BaseTool invocation is a thread adapter, not native async or a thread-safe
 promise. JSON bulk relationship writes have an upstream limitation (TD-02);
 ingestion deliberately uses incremental object writes. See `TECH_DEBT.md`.
 
+## Claim (epistemic) tools
+
+Claims are sourced assertions/denials in a bitemporal epistemic layer, distinct
+from mutable graph edges: they create no current-state edges and never appear in
+Cypher matching. `GestaltDBClaimToolkit(graph=graph)` returns three read-only
+tools that call the epistemic API directly; no write path is exposed.
+
+- `gestaltdb_claim_status` reports `supported`/`refuted`/`both`/`unknown` with
+  bounded supporting and refuting evidence for one statement.
+- `gestaltdb_claim_search` lists historical claim versions by `statement_id`,
+  subject, predicate, object (`object_kind` entity/literal), agent, source, world
+  or polarity.
+- `gestaltdb_claim_explanation` returns a bounded claim/rule derivation graph with
+  premise/derivation edges, preserving historical version/logical ids and an
+  explicit `truncated` flag. It is not a relevance ranking.
+
+Agent inputs are limited to filters and bitemporal horizons (`valid_time`,
+`system_time`, or `through_commit`). The graph handle and caps (`max_evidence`,
+`max_claims`, `max_depth`, `max_nodes`, `max_edges`, `max_chars`) are
+application-controlled; extra arguments are rejected. Serialized claim versions
+keep statement/claim/logical/version ids, commit metadata, valid interval, system
+time, operation, payload hash and provenance. As with query output, caps bound
+returned JSON, not execution time, intermediate memory, or materialization.
+Tool-facing claim errors are redacted to a single generic message.
+
 ## Tested platform and non-goals
 
 CI exercises Python 3.10–3.13/LMDB, minimum and latest direct dependencies,
@@ -93,6 +122,6 @@ installed wheels, plus LevelDB and PyRex/RocksDB contract tests on Linux/Python 
 The standard tool-suite baseline is pinned to remain compatible with Core 1.0.
 No external services/model credentials are required.
 
-Retrievers, claim-aware tools, vector stores, chat history, QA chains, native
+Retrievers, vector stores, chat history, QA chains, native
 async, and publishing automation are not part of this first integration.
 See BST-09 onward for approved follow-on scope. This version remains unreleased.

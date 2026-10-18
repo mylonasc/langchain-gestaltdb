@@ -1,9 +1,10 @@
 # langchain-gestaltdb
 
 A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
-**In development:** the graph adapter, schema, ingestion, and read-only-default
-agent toolkit are available. See [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md)
-and the [technical debt register](TECH_DEBT.md).
+**In development:** the graph adapter, schema, ingestion, read-only-default
+agent toolkit, and read-only claim status/provenance tools are available. See
+[the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md) and the
+[technical debt register](TECH_DEBT.md).
 
 ```python
 from langchain_gestaltdb import GestaltDBGraph
@@ -106,12 +107,47 @@ Treat graph/source text as untrusted data, not instructions. Read-only prevents
 writes but does not bound execution cost, intermediate memory, or result collection.
 LangChain's async tool adapter offloads synchronous work; no native async is claimed.
 
+### Claim status and provenance tools
+
+GestaltDB claims are sourced assertions or denials in a bitemporal epistemic
+layer. They are **not** graph edges: they do not create current-state edges and
+never appear in Cypher results or `MATCH` patterns. `GestaltDBClaimToolkit`
+exposes read-only, bounded tools for them and exposes no write path.
+
+```python
+from langchain_gestaltdb import GestaltDBClaimToolkit
+
+# Use inside a GestaltDBGraph context; tools borrow the wrapper.
+# status, search, explain = GestaltDBClaimToolkit(graph=graph).get_tools()
+# status.invoke({"subject": "alice", "predicate": "WORKS_FOR", "object": "acme",
+#                "world": "reported", "valid_time": "2024-06-01T00:00:00Z"})
+# explain.invoke({"claim_id": "claim:...", "valid_time": "2024-06-01T00:00:00Z"})
+```
+
+`gestaltdb_claim_status` reports a distinct `supported`, `refuted`, `both` or
+`unknown` status with bounded supporting/refuting evidence under open-world
+semantics. `gestaltdb_claim_search` lists claims by statement, subject,
+predicate, object, agent, source, world or polarity. `gestaltdb_claim_explanation`
+returns a bounded claim/rule derivation graph. Agent/source/world and polarity
+filters plus valid time and system time (or `through_commit`) are supported.
+Explanations preserve historical version/logical ids and explicit truncation
+metadata. Only filters and times are agent inputs: the graph, caps
+(`max_evidence`, `max_claims`, `max_depth`, `max_nodes`, `max_edges`,
+`max_chars`) and horizons are application-controlled. Output caps bound returned
+JSON, not execution time or memory.
+
 ## Development
 
 Run the complete offline ingest → schema → tool-call → source-evidence example:
 
 ```bash
 uv run --locked python examples/graph_agent.py
+```
+
+Run the offline claim status/contradiction/provenance example:
+
+```bash
+uv run --locked python examples/claim_agent.py
 ```
 
 No model, API key, database server, or network service is required. The scripted
