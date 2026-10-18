@@ -20,6 +20,21 @@ Low-level queries permit writes and propagate upstream errors unchanged: do not
 give this API directly to an untrusted agent. Backend transaction/snapshot
 guarantees are unchanged; there is no native async or execution timeout.
 
+### Schema discovery
+
+`graph.get_schema` returns stable JSON text; `graph.get_structured_schema` returns
+a defensive copy. Both lazily cache inspection; call `graph.refresh_schema()`
+after external writes. Defaults inspect 100 canonical nodes and 100 edges, plus
+up to two endpoint nodes per edge. This bypasses stale secondary indexes.
+
+For different bounds, wrap the database with
+`GestaltDBGraph(db, schema_node_limit=20, schema_edge_limit=20)`. Set a limit to
+`None` only to explicitly allow exhaustive inspection, or supply a trusted
+`schema_override` dictionary to avoid scans entirely. Sampling follows backend
+key order, is not representative, and is not a coherent concurrent snapshot.
+The schema includes truncation, property types, endpoint labels, index definitions,
+and GestaltDB dialect guidance. It does not enforce a closed-world schema.
+
 ## Development
 
 Use Python 3.10–3.13 (3.12 recommended) and [uv](https://docs.astral.sh/uv/):
