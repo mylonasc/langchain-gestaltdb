@@ -96,17 +96,17 @@ The YAML gate's check-run name is `CI gate`, not `CI / CI gate` in the API.
 Its protected-main requirement is bound to the GitHub Actions app (ID 15368),
 not an arbitrary status publisher.
 
-## Release policy — publishing pipeline deferred
+## Release policy — explicit approval and Trusted Publishing
 
-- No automatic releases, tags, GitHub Releases, PyPI uploads, or TestPyPI uploads
-  are authorized by merging code. Do not run `twine upload` or `uv publish`.
-- `0.1.0.dev0` is an unreleased bootstrap version. Version changes require a PR;
-  release version/tag conventions and the publication trigger are not finalized.
-- BST-12 tracks release automation. Inspect maintained LangChain partner-package
-  workflows before adapting one; the legacy CLI scaffold is not a release policy.
-- A future workflow should reuse successful CI/build validation, use PyPI Trusted
-  Publishing/OIDC with a protected environment and least privilege, and require
-  explicit maintainer approval. Do not add credentials in advance.
+- Merging code never authorizes publication. Each release needs explicit maintainer
+  authorization; the maintainer authorized the first release **0.1.0 including #31**.
+- Use `.github/workflows/publish.yml`, manually dispatched on main with the exact
+  stable `X.Y.Z` version. Version changes require a PR and `uv lock`; tags are `vX.Y.Z`.
+- Publish the artifacts tested by successful exact-main CI, using PyPI Trusted
+  Publishing/OIDC and required `pypi` environment approval. Never upload from a
+  local token, grant publishing permissions to test jobs, or bypass approval gates.
+- Follow `docs/RELEASING.md` for setup, staging decision, action pins, approvals,
+  verification and recovery. No TestPyPI publisher or credentials are configured.
 - Before any explicitly authorized release, verify the exact main commit passed
   CI, dependency compatibility and examples are documented, wheel/sdist metadata
   and packaged files are correct, and release notes/version changes are reviewed.

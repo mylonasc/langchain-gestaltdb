@@ -103,7 +103,7 @@ The linked issues contain the full acceptance checklists and reverse links.
 - [x] **BST-08 / P0 — First-release readiness** — [#9](https://github.com/mylonasc/langchain-gestaltdb/issues/9). Merged in PR #24. End-to-end ingest/inspect/query example, minimum/latest dependency and optional-backend coverage, source provenance, lifecycle/serialization/stale-index regressions, accurate docs. No publishing authorization.
 - [x] **BST-09 / P1 — Bounded graph retriever** — [#10](https://github.com/mylonasc/langchain-gestaltdb/issues/10). Merged in PR #26. `BaseRetriever`, indexed or supplied seed resolution, typed traversal, hop/fanout/entity/output caps, source-linked Documents, deterministic tests. External vector search may supply seeds.
 - [x] **BST-10 / P1 — Read-side epistemic tools** — [#11](https://github.com/mylonasc/langchain-gestaltdb/issues/11). Merged in PR #29. Claim status, source/agent/world filters, valid/system time, bounded provenance explanations, contradictory/historical evidence examples.
-- [ ] **BST-11 / P1 — Opt-in claim writes** — [#12](https://github.com/mylonasc/langchain-gestaltdb/issues/12). Blocked by **BST-10**. Sourced assertion, correction, retraction; explicit authorization; history and identity tests; never silently infer authority or confidence.
+- [x] **BST-11 / P1 — Opt-in claim writes** — [#12](https://github.com/mylonasc/langchain-gestaltdb/issues/12). Merged in PR #31. Sourced assertion, correction, retraction; explicit authorization; history and identity tests; never silently infer authority or confidence.
 - [ ] **BST-12 / P2 — Release pipeline design/approval** — [#13](https://github.com/mylonasc/langchain-gestaltdb/issues/13). Blocked by **BST-08**. Maintainer-approved version/tag/trigger strategy, review maintained LangChain workflows, consider OIDC/Trusted Publishing and protected environments, artifact validation, release runbook. Implementation/publication deferred.
 
 ### Dependency graph
@@ -200,8 +200,10 @@ dependencies, installed wheel, and LevelDB/PyRex contracts. The combined local
 suite at that commit passed 144 tests with 99.28% package coverage. Review fixes
 cover single-resolution claim status/evidence, full-envelope JSON character caps,
 explicit retrieval truncation reasons, and real deferred-ingest traversal.
-BST-11 remains unmerged; BST-12 release automation remains deferred. These merges
-do not authorize publishing or tags.
+BST-11 subsequently merged in PR #31. The maintainer then explicitly authorized
+BST-12 implementation and the first public release, 0.1.0 including BST-11, with
+PyPI Trusted Publishing through `publish.yml`. That one-off approval does not
+authorize subsequent releases. See `docs/RELEASING.md` for the release policy.
 
 ## Deferred, not implied by this epic
 

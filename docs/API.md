@@ -207,4 +207,5 @@ No external services/model credentials are required.
 Vector stores, chat history, QA chains, native async, and publishing automation
 are not implemented. Bounded typed-graph retrieval (BST-09) and read-only claim
 tools (BST-10) and opt-in claim writes (BST-11) are additive follow-ons to the first
-integration. Publishing remains deferred to BST-12. This version remains unreleased.
+integration. Version 0.1.0 is the first public release; publishing requires explicit
+approval through `publish.yml`. See `RELEASING.md` and the root changelog.

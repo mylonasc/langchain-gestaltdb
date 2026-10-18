@@ -6,11 +6,17 @@
      Automating this badge is tracked as TD-05 in TECH_DEBT.md. -->
 
 A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
-**In development:** the graph adapter, schema, ingestion, read-only-default
+The graph adapter, schema, ingestion, read-only-default
 agent toolkit, bounded typed-graph retriever, read-only claim status/provenance
 tools, and explicitly enabled claim writes are available. See
 [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md) and the
 [technical debt register](TECH_DEBT.md).
+
+Install with an explicit embedded backend (Python 3.10–3.13):
+
+```bash
+pip install 'langchain-gestaltdb[lmdb]==0.1.0'
+```
 
 ```python
 from langchain_gestaltdb import GestaltDBGraph
@@ -289,8 +295,10 @@ uv run --locked python -m gestaltdb.agent_docs search sample_typed_subgraph
 ## Contributing and releases
 
 Read [AGENTS.md](AGENTS.md) for branch, PR, CI, and release policy. Work goes
-through issue-scoped branches and PRs; `main` is protected. Publishing automation
-is deliberately deferred. This repository retains its Apache-2.0 license.
+through issue-scoped branches and PRs; `main` is protected. Releases use explicit
+maintainer approval and PyPI Trusted Publishing via `publish.yml`; merging alone
+never publishes. See [release notes](CHANGELOG.md) and the
+[release runbook](docs/RELEASING.md). This repository retains its Apache-2.0 license.
 
 ## Scaffold provenance
 

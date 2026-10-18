@@ -1,0 +1,121 @@
+name: Publish
+run-name: Publish ${{ inputs.version }} by @${{ github.actor }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Reviewed stable version (X.Y.Z); must match main's pyproject.toml"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-publish
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Verify release candidate
+    if: github.repository == 'mylonasc/langchain-gestaltdb' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Require reviewed version and green exact-main CI
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: python3 scripts/release.py preflight "$VERSION"
+      - name: Download the distributions tested by that CI run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ steps.candidate.outputs.artifact-name }}
+          run-id: ${{ steps.candidate.outputs.ci-run-id }}
+          github-token: ${{ github.token }}
+          path: dist
+      - name: Verify metadata, packaged files and hashes
+        env:
+          VERSION: ${{ inputs.version }}
+        run: python3 scripts/release.py verify-artifacts "$VERSION" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: validated-distributions
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish to PyPI
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/langchain-gestaltdb
+    permissions:
+      id-token: write
+    steps:
+      # No checkout, dependency installation or build code in this privileged job.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: validated-distributions
+          path: dist
+      - name: Publish the approved distributions using Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          packages-dir: dist/
+          print-hash: true
+          attestations: true
+
+  verify-install:
+    name: Published wheel (Python ${{ matrix.python }})
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.12.21"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: validated-distributions
+          path: dist
+      - name: Verify public hashes and install the wheel from PyPI outside the checkout
+        env:
+          VERSION: ${{ inputs.version }}
+          PYTHON: ${{ matrix.python }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if python3 scripts/release.py verify-pypi "$VERSION"; then break; fi
+            if [ "$attempt" = 5 ]; then exit 1; fi
+            sleep 15
+          done
+          uv venv --python "$PYTHON" "$RUNNER_TEMP/released-env"
+          for attempt in 1 2 3 4 5; do
+            if uv pip install --python "$RUNNER_TEMP/released-env/bin/python" --no-cache \
+              --index-url https://pypi.org/simple --only-binary langchain-gestaltdb \
+              "langchain-gestaltdb[lmdb]==$VERSION" 'pytest>=8,<10' 'langchain-tests==1.0.0'; then
+              break
+            fi
+            if [ "$attempt" = 5 ]; then exit 1; fi
+            sleep 15
+          done
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/released-env/bin/python" -c 'import os, importlib.metadata as m, langchain_gestaltdb as g; assert m.version("langchain-gestaltdb") == os.environ["VERSION"]; assert "site-packages" in g.__file__'
+          "$RUNNER_TEMP/released-env/bin/python" -m pytest "$GITHUB_WORKSPACE/tests" -c "$GITHUB_WORKSPACE/pyproject.toml"
