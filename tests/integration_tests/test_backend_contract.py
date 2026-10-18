@@ -8,11 +8,13 @@ import pytest
 
 from langchain_gestaltdb import (
     GestaltDBGraph,
+    GestaltDBRetriever,
     GestaltDBToolkit,
     GraphDocument,
     GraphNode,
     GraphRelationship,
     ReadOnlyQueryError,
+    RetrievalHop,
 )
 
 
@@ -34,5 +36,17 @@ def test_backend_ingestion_schema_tool_and_reopen(tmp_path: Path) -> None:
         assert output["records"] == [{"id": "a"}]
         with pytest.raises(ReadOnlyQueryError):
             graph.query_read_only("MATCH (n) DETACH DELETE n")
+        retriever = GestaltDBRetriever(
+            graph=graph,
+            hops=(RetrievalHop(edge_type="WORKS_FOR", direction="out", sample_size=5),),
+            seed_ids=("a",),
+        )
+        documents = retriever.invoke("unused")
+        assert [document.metadata["id"] for document in documents] == ["a", "b"]
+        assert documents[1].metadata["relationship_types"] == ["WORKS_FOR"]
+        assert all(
+            isinstance(value, str)
+            for value in documents[1].metadata["paths"][0]["steps"][0].values()
+        )
     with GestaltDBGraph.open(path) as reopened:
         assert len(reopened.query_read_only("MATCH (n) RETURN n")) == 2

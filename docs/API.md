@@ -13,6 +13,8 @@ Import from `langchain_gestaltdb`:
 | `GestaltDBSchemaTool` | Cached/sampled schema and bounded refresh |
 | `GestaltDBQueryTool` | Read-only-default parameterized Cypher tool |
 | `GestaltDBToolkit` | Consistently configured schema/query tools |
+| `GestaltDBRetriever` | Bounded typed-graph `BaseRetriever` over seeds |
+| `RetrievalHop` | One typed traversal hop (edge type, direction, fanout) |
 | `ReadOnlyQueryError` | Query could not be proven read-only |
 
 `GraphDocument.from_external(model_or_mapping)` validates equivalent fields
@@ -86,6 +88,34 @@ Async BaseTool invocation is a thread adapter, not native async or a thread-safe
 promise. JSON bulk relationship writes have an upstream limitation (TD-02);
 ingestion deliberately uses incremental object writes. See `TECH_DEBT.md`.
 
+## Bounded graph retrieval
+
+`GestaltDBRetriever(graph, hops=(), seed_ids=(), seed_label=None,
+seed_property=None, seed_resolver=None, max_seeds=10, max_paths=50,
+max_entities=100, max_content_chars=2000, include_sources=True,
+max_sources_per_entity=5, rng_seed=0)` is a LangChain `BaseRetriever`.
+
+- Exactly one seed strategy is required: `seed_ids`, a `seed_resolver`
+  (`Callable[[str], Sequence[str]]`, e.g. an external vector-store lookup), or the
+  indexed `seed_label` + `seed_property` pair. Indexed resolution passes the query
+  string as an exact property value and therefore needs a pre-created
+  `create_node_property_index`; non-string or fuzzy matches require a resolver.
+- `hops` is an ordered tuple of `RetrievalHop(edge_type, direction=out, sample_size=10)`.
+  `direction` is `out`/`in`/`any`; `edge_type` matches `properties['type']`.
+- Output is one `Document` per distinct entity. Metadata includes `id`, `labels`,
+  `properties`, normalized `paths` (`edge_id`, `source_id`, `target_id`,
+  `edge_type`, `direction`), `relationship_types`, `hops`, `is_seed`, `sources`
+  (`document_id` + metadata), and `truncated`. `page_content` is a deterministic
+  entity rendering plus linked source text, capped by `max_content_chars`.
+
+Caps: `len(hops) <= 8`, `1 <= sample_size <= 100`, plus `max_seeds`, `max_paths`,
+`max_entities`, and `max_sources_per_entity`. Sampled IDs are decoded from bytes;
+absent seeds are skipped and metadata stays JSON-safe. Ordering is deterministic
+(seeds first, then sorted IDs) and is **not** a relevance ranking; no database
+ordering is promised. The retriever only reads, never fabricates entities, never
+writes, and never rebuilds indexes: stale `edge_type` indexes fail closed. Seeding
+through an external vector store does not make this package a vector store.
+
 ## Tested platform and non-goals
 
 CI exercises Python 3.10–3.13/LMDB, minimum and latest direct dependencies,
@@ -93,6 +123,7 @@ installed wheels, plus LevelDB and PyRex/RocksDB contract tests on Linux/Python 
 The standard tool-suite baseline is pinned to remain compatible with Core 1.0.
 No external services/model credentials are required.
 
-Retrievers, claim-aware tools, vector stores, chat history, QA chains, native
-async, and publishing automation are not part of this first integration.
-See BST-09 onward for approved follow-on scope. This version remains unreleased.
+Claim-aware tools, vector stores, chat history, QA chains, native async, and
+publishing automation are not part of this first integration. Bounded typed-graph
+retrieval (BST-09) is an additive follow-on, implemented on a review branch.
+See BST-10 onward for further approved follow-on scope. This version remains unreleased.
