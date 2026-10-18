@@ -27,6 +27,8 @@ rocksdb = ["gestaltdb[rocksdb]>=0.12.0,<0.13"]
 
 [dependency-groups]
 dev = [
+    # Keep the standard-suite baseline compatible with the declared Core 1.0 floor.
+    "langchain-tests==1.0.0",
     "mypy>=1.15,<2",
     "pytest>=8,<10",
     "pytest-cov>=6,<8",

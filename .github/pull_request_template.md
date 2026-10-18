@@ -14,4 +14,5 @@ Epic checkpoint: BST-<!-- index -->
 - [ ] Required `CI gate` is green on the current branch and main is up to date.
 - [ ] API/behavior changes and limitations are documented.
 - [ ] No secrets, paid-service requirement, or release/publishing side effects.
+- [ ] Deferred improvements are recorded in TECH_DEBT.md with linked issues and exit criteria.
 - [ ] Epic and issue checkpoints reflect merged work only (update on merge).
