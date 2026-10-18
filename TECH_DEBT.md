@@ -47,3 +47,16 @@ stay in `PROJECT_BOOTSTRAP_EPIC.md` instead.
   then benchmark before adopting the optimized path.
 - Discovered during: BST-03 installed-release probes; regression coverage belongs
   with BST-05 ingestion. Related PR linked in #16.
+
+### TD-03 — AST policy coupling / P2 / open
+
+- Issue: [#20](https://github.com/mylonasc/langchain-gestaltdb/issues/20).
+- Area: `_read_only.py`, supported GestaltDB minor-version dependency bound.
+- Impact: upstream AST changes need policy review; no public read-only classifier exists.
+- Reason: an upstream API proposal is outside this integration's first delivery.
+- Interim approach: isolated positive clause/root allowlists, recursive subquery
+  and UNION inspection, unknown-syntax rejection, no procedures by default, and
+  state-unchanged adversarial tests. Never call private `_plan_has_writes`.
+- Owner: integration maintainers. Revisit on every GestaltDB upgrade.
+- Exit: verify a public upstream classifier against the adversarial suite before
+  replacing the isolated adapter. Write prevention itself is not deferred.

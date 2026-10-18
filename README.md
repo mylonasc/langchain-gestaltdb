@@ -20,6 +20,13 @@ Low-level queries permit writes and propagate upstream errors unchanged: do not
 give this API directly to an untrusted agent. Backend transaction/snapshot
 guarantees are unchanged; there is no native async or execution timeout.
 
+For parsed-AST write prevention, call `graph.query_read_only(query, params)`.
+It rejects mutations, schema changes, unknown syntax, and procedures by default,
+including writes inside subqueries/UNION. Known read procedures may be explicitly
+allowlisted by a trusted application. Query text is capped at 10000 characters.
+Read-only is **not** protection against expensive reads: use process/resource
+isolation for hostile workloads. Output caps are not execution timeouts.
+
 ### Schema discovery
 
 `graph.get_schema` returns stable JSON text; `graph.get_structured_schema` returns
