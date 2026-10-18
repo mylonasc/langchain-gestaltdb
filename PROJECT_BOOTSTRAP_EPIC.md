@@ -175,8 +175,8 @@ BST-01–BST-08 are merged through PRs #14, #17, #18, #19, #21, #22, and #24.
 The [readiness CI run](https://github.com/mylonasc/langchain-gestaltdb/actions/runs/39129774859)
 passed all eleven checks: quality, Python 3.10–3.13, minimum/latest dependencies,
 installed wheel, LevelDB/PyRex backend contracts, and the aggregate gate.
-The suite contains 95 tests, including applicable LangChain standard tool tests,
-and measured 98.73% package statement coverage on Python 3.12 (90% required).
+At that run, the suite contained 95 tests, including applicable LangChain standard
+tool tests, and measured 98.73% package statement coverage on Python 3.12 (90% required).
 
 Run `uv run --locked python examples/graph_agent.py` for the offline end-to-end
 source-linked tool-call example. See [docs/API.md](docs/API.md) for public exports,
