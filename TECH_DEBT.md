@@ -20,6 +20,8 @@ stay in `PROJECT_BOOTSTRAP_EPIC.md` instead.
 
 - Issue: [#15](https://github.com/mylonasc/langchain-gestaltdb/issues/15).
 - Area: `pyproject.toml` scoped mypy override for `gestaltdb.*`.
+- A second narrow override skips NumPy's 3.12-syntax stubs when checking our
+  Python 3.10 target. NumPy is only transitive and not part of our public API.
 - Impact: static checking cannot verify upstream method signatures.
 - Reason: GestaltDB 0.12.0 does not ship a typed package contract.
 - Interim approach: strict typing locally, real installed-release tests for

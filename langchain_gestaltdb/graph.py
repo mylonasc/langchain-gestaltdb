@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from gestaltdb.graphdb import GraphDB
 
+from langchain_gestaltdb._ingestion import ingest
 from langchain_gestaltdb._schema import discover_schema
 from langchain_gestaltdb._serialization import normalize
 
@@ -114,6 +116,18 @@ class GestaltDBGraph:
         if schema is None:
             schema = discover_schema(graph, self._schema_node_limit, self._schema_edge_limit)
         self._schema = normalize(schema)
+
+    def add_graph_documents(
+        self, graph_documents: Iterable[Any], include_source: bool = False
+    ) -> None:
+        """Merge validated graph documents using incremental writes.
+
+        Accepts local GraphDocument or equivalent mappings/Pydantic models.
+        This operation is not whole-import atomic. Sources are ordinary graph
+        provenance, not epistemic claims. The schema cache is invalidated.
+        """
+        self._schema = None
+        ingest(self.graph, graph_documents, include_source)
 
     def __enter__(self) -> GestaltDBGraph:
         _ = self.graph

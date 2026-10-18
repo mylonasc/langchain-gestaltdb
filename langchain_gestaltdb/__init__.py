@@ -1,5 +1,6 @@
 """Graph-first LangChain integration for GestaltDB."""
 
 from langchain_gestaltdb.graph import GestaltDBGraph
+from langchain_gestaltdb.graph_document import GraphDocument, GraphNode, GraphRelationship
 
-__all__ = ["GestaltDBGraph"]
+__all__ = ["GestaltDBGraph", "GraphDocument", "GraphNode", "GraphRelationship"]
