@@ -1,8 +1,24 @@
 # langchain-gestaltdb
 
 A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
-**Bootstrap stage:** the package is installable, but graph adapters, tools, and
-retrievers are not implemented yet. See [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md).
+**In development:** the lifecycle/query adapter is available; schema, ingestion,
+and tools are being implemented. See [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md)
+and the [technical debt register](TECH_DEBT.md).
+
+```python
+from langchain_gestaltdb import GestaltDBGraph
+
+with GestaltDBGraph.create("my-graph", backend="lmdb") as graph:
+    rows = graph.query("MATCH (n) WHERE n.id = $id RETURN n", {"id": "alice"})
+```
+
+Wrapping an existing `GraphDB` borrows its handle; create/open own their handles.
+Closing a borrowed wrapper leaves the original database open. Queries return
+JSON-compatible dictionaries, including native nodes/edges and paths. Temporal
+values use a `$type` tag plus exact fields; unsupported objects fail explicitly.
+Low-level queries permit writes and propagate upstream errors unchanged: do not
+give this API directly to an untrusted agent. Backend transaction/snapshot
+guarantees are unchanged; there is no native async or execution timeout.
 
 ## Development
 
