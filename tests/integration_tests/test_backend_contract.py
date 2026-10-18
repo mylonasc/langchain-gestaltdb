@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import pytest
+from gestaltdb.graphdb import Edge
 
 from langchain_gestaltdb import (
     GestaltDBClaimStatusTool,
@@ -49,6 +50,23 @@ def test_backend_ingestion_schema_tool_and_reopen(tmp_path: Path) -> None:
             isinstance(value, str)
             for value in documents[1].metadata["paths"][0]["steps"][0].values()
         )
+        edge = Edge("deferred", "b", "a", properties={"type": "LINKS"})
+        graph.graph.ingest_edges_arrow(
+            ["deferred"],
+            ["b"],
+            ["a"],
+            ["LINKS"],
+            [graph.graph.entity_serializer.serialize(edge, "Edge")],
+            native=False,
+            index_mode="defer",
+        )
+        deferred = GestaltDBRetriever(
+            graph=graph,
+            seed_ids=("b",),
+            hops=(RetrievalHop(edge_type="LINKS"),),
+        ).invoke("unused")
+        assert [document.metadata["id"] for document in deferred] == ["b", "a"]
+        assert "edge_type" in graph.graph.stale_indexes()
     with GestaltDBGraph.open(path) as reopened:
         assert len(reopened.query_read_only("MATCH (n) RETURN n")) == 2
 

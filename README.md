@@ -144,11 +144,18 @@ decoded to strings and all metadata stays JSON-safe.
 
 Traversal is bounded: at most 8 `hops`, `sample_size` of 1–100 per hop,
 `max_paths`, `max_entities`, and `max_content_chars`. `max_seeds` bounds
-resolution. Truncation is flagged per document (`truncated`). Output ordering is deterministic (seeds first, then
+resolution. `result_truncated` is a run-level flag for seed/path/entity caps,
+copied onto every returned document. `content_truncated` and `sources_truncated`
+describe per-document clipping; `truncated` is true if any of these flags is true.
+Sampling intentionally selects a subset and does not set these flags. Output ordering is deterministic (seeds first, then
 sorted IDs) but is **not** a relevance ranking, and no database ordering is
-promised. The retriever only reads; it never writes or rebuilds indexes. Stale
-`edge_type` indexes fail closed and must be rebuilt explicitly. External vector
+promised. The retriever only reads; it never writes or rebuilds indexes. Typed
+adjacency remains usable during deferred edge ingestion; indexed seeding rejects
+stale node-label/property indexes until explicitly rebuilt. External vector
 search may supply seeds without making this package a vector store.
+
+Caps bound returned entities and content, not database work or total metadata
+size. Resolvers, property normalization, and source lookup may still be costly.
 
 ### Claim status and provenance tools
 

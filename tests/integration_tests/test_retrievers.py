@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from gestaltdb.graphdb import Edge, Node
@@ -175,6 +174,9 @@ def test_caps_bound_fanout_paths_entities_seeds_and_content(tmp_path: Path) -> N
         )
         assert len(content.invoke("x")[0].page_content) == 10
         assert content.invoke("x")[0].page_content == "Leaf leaf-"
+        assert content.invoke("x")[0].metadata["content_truncated"] is True
+        assert content.invoke("x")[0].metadata["truncated"] is True
+        assert content.invoke("x")[0].metadata["result_truncated"] is False
 
         many = GestaltDBRetriever(
             graph=graph,
@@ -183,6 +185,9 @@ def test_caps_bound_fanout_paths_entities_seeds_and_content(tmp_path: Path) -> N
             max_seeds=3,
         )
         assert len(many.invoke("x")) == 3
+        assert all(document.metadata["result_truncated"] for document in many.invoke("x"))
+        exact = GestaltDBRetriever(graph=graph, seed_ids=("hub",), max_seeds=1).invoke("x")
+        assert exact[0].metadata["result_truncated"] is False
 
 
 def test_deterministic_sampling_with_fixed_seed(tmp_path: Path) -> None:
@@ -231,13 +236,45 @@ def test_metadata_is_complete_and_reads_do_not_modify_graph(tmp_path: Path) -> N
         assert {document.metadata["id"] for document in documents} == {"alice", "acme"}
 
 
-def test_stale_edge_type_indexes_fail_closed(tmp_path: Path) -> None:
+def test_deferred_edge_ingest_keeps_traversal_and_sources_usable(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         build_graph(graph)
-        retriever = indexed_retriever(graph)
-        with patch.object(graph.graph, "stale_indexes", return_value=("edge_type",)):
-            with pytest.raises(RuntimeError, match="rebuild"):
-                retriever.invoke("Alice")
+        db = graph.graph
+        edge = Edge("deferred", "alice", "bob", properties={"type": "KNOWS"})
+        db.ingest_edges_arrow(
+            ["deferred"],
+            ["alice"],
+            ["bob"],
+            ["KNOWS"],
+            [db.entity_serializer.serialize(edge, "Edge")],
+            native=False,
+            index_mode="defer",
+        )
+        assert "edge_type" in db.stale_indexes()
+        with pytest.raises(RuntimeError, match="stale"):
+            list(db.iter_edge_ids_by_type("KNOWS"))
+        documents = GestaltDBRetriever(
+            graph=graph,
+            seed_ids=("alice",),
+            hops=(RetrievalHop(edge_type="KNOWS"),),
+        ).invoke("ignored")
+        assert [document.metadata["id"] for document in documents] == ["alice", "bob"]
+        assert documents[0].metadata["sources"]
+        assert "edge_type" in db.stale_indexes()  # no implicit rebuild
+
+
+def test_indexed_seed_resolution_rejects_stale_node_indexes(tmp_path: Path) -> None:
+    with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
+        graph.graph.create_node_property_index(NAME)
+        node = Node("new", labels=["Person"], properties={NAME: "New"})
+        graph.graph.ingest_nodes_arrow(
+            ["new"],
+            [graph.graph.entity_serializer.serialize(node, "Node")],
+            native=False,
+            index_mode="defer",
+        )
+        with pytest.raises(RuntimeError, match="stale"):
+            indexed_retriever(graph).invoke("New")
 
 
 def test_async_adapter_matches_sync(tmp_path: Path) -> None:
@@ -342,6 +379,10 @@ def test_source_linking_skips_foreign_mentions_and_honors_cap(tmp_path: Path) ->
         assert {source["document_id"] for source in sources} == {"s1", "s2"}
         capped = indexed_retriever(graph, max_sources_per_entity=1).invoke("Alice")
         assert len(capped[0].metadata["sources"]) == 1
+        assert capped[0].metadata["sources_truncated"] is True
+        assert capped[0].metadata["result_truncated"] is False
+        assert capped[0].metadata["truncated"] is True
+        assert documents[0].metadata["sources_truncated"] is False
 
 
 def test_max_paths_truncation_flag(tmp_path: Path) -> None:

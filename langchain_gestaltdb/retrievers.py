@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import json
 import random
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any, Literal
 
+from gestaltdb.graphdb import GraphDB
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
@@ -98,39 +99,35 @@ class GestaltDBRetriever(BaseRetriever):
         self, query: str, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:
         db = self.graph.graph
-        if self.hops or self.include_sources:
-            stale = set(db.stale_indexes())
-            if "edge_type" in stale:
-                raise RuntimeError(
-                    "typed traversal requires current edge_type indexes; "
-                    "call graph.graph.rebuild_deferred_indexes() first"
-                )
-        seeds = self._resolve_seeds(db, query)
+        # Typed adjacency stays current during deferred ingestion independently
+        # of secondary edge_type indexes. Indexed seeding checks its own indexes.
+        seeds, seeds_truncated = self._resolve_seeds(db, query)
         if not seeds:
             return []
         entity_paths, truncated = self._traverse(db, seeds)
-        ordered = list(seeds) + [value for value in sorted(entity_paths) if value not in set(seeds)]
+        truncated = truncated or seeds_truncated
+        seed_set = set(seeds)
+        ordered = list(seeds) + [value for value in sorted(entity_paths) if value not in seed_set]
         if len(ordered) > self.max_entities:
             ordered = ordered[: self.max_entities]
             truncated = True
-        seed_set = set(seeds)
         return [
             self._document(db, entity_id, entity_paths[entity_id], entity_id in seed_set, truncated)
             for entity_id in ordered
         ]
 
-    def _resolve_seeds(self, db: Any, query: str) -> list[str]:
+    def _resolve_seeds(self, db: GraphDB, query: str) -> tuple[list[str], bool]:
         if self.seed_ids:
-            candidates: list[str] = list(self.seed_ids)
+            candidates: Iterable[str] = self.seed_ids
         elif self.seed_resolver is not None:
-            candidates = [str(value) for value in self.seed_resolver(query)]
+            candidates = (str(value) for value in self.seed_resolver(query))
         else:
-            candidates = [
+            candidates = (
                 db.key_to_string(key)
                 for key in db.iter_node_ids_by_label_property(
                     self.seed_label, self.seed_property, query
                 )
-            ]
+            )
         seeds: list[str] = []
         seen: set[str] = set()
         for candidate in candidates:
@@ -139,12 +136,14 @@ class GestaltDBRetriever(BaseRetriever):
             seen.add(candidate)
             if db.get_node(db.node_key_to_bytes(candidate)) is None:
                 continue  # Never fabricate documents for absent entities.
-            seeds.append(candidate)
             if len(seeds) >= self.max_seeds:
-                break
-        return seeds
+                return seeds, True
+            seeds.append(candidate)
+        return seeds, False
 
-    def _traverse(self, db: Any, seeds: list[str]) -> tuple[dict[str, list[dict[str, Any]]], bool]:
+    def _traverse(
+        self, db: GraphDB, seeds: list[str]
+    ) -> tuple[dict[str, list[dict[str, Any]]], bool]:
         entity_paths: dict[str, list[dict[str, Any]]] = {
             seed: [{"seed": seed, "steps": []}] for seed in seeds
         }
@@ -183,7 +182,7 @@ class GestaltDBRetriever(BaseRetriever):
 
     def _document(
         self,
-        db: Any,
+        db: GraphDB,
         entity_id: str,
         paths: list[dict[str, Any]],
         is_seed: bool,
@@ -193,7 +192,9 @@ class GestaltDBRetriever(BaseRetriever):
         labels = list(node.labels) if node is not None else []
         properties = normalize(node.properties) if node is not None else {}
         relationship_types = sorted({step["edge_type"] for path in paths for step in path["steps"]})
-        sources = self._sources(db, entity_id) if self.include_sources else []
+        sources, sources_truncated = (
+            self._sources(db, entity_id) if self.include_sources else ([], False)
+        )
         content = self._render(entity_id, labels, properties)
         if sources:
             content = (
@@ -217,19 +218,26 @@ class GestaltDBRetriever(BaseRetriever):
                 ],
                 "hops": max((len(path["steps"]) for path in paths), default=0),
                 "is_seed": is_seed,
-                "truncated": truncated,
+                "result_truncated": truncated,
+                "content_truncated": len(content) > self.max_content_chars,
+                "sources_truncated": sources_truncated,
+                "truncated": truncated
+                or sources_truncated
+                or len(content) > self.max_content_chars,
             },
         )
 
-    def _sources(self, db: Any, entity_id: str) -> list[dict[str, Any]]:
+    def _sources(self, db: GraphDB, entity_id: str) -> tuple[list[dict[str, Any]], bool]:
         if self.max_sources_per_entity == 0:
-            return []
+            return [], False  # Explicitly disabled, not a partial source lookup.
         found: list[dict[str, Any]] = []
         for record in db.iter_typed_adjacency(entity_id, MENTIONS, direction="in"):
             source_id = db.key_to_string(record["source_id"])
             node = db.get_node(db.node_key_to_bytes(source_id))
             if node is None or SOURCE_LABEL not in node.labels:
                 continue
+            if len(found) >= self.max_sources_per_entity:
+                return found, True
             node_properties = node.properties or {}
             found.append(
                 {
@@ -239,9 +247,7 @@ class GestaltDBRetriever(BaseRetriever):
                     "metadata": normalize(node_properties.get("metadata") or {}),
                 }
             )
-            if len(found) >= self.max_sources_per_entity:
-                break
-        return found
+        return found, False
 
     @staticmethod
     def _render(entity_id: str, labels: list[str], properties: dict[str, Any]) -> str:

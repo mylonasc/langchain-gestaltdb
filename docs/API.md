@@ -109,7 +109,7 @@ max_sources_per_entity=5, rng_seed=0)` is a LangChain `BaseRetriever`.
 - Output is one `Document` per distinct entity. Metadata includes `id`, `labels`,
   `properties`, normalized `paths` (`edge_id`, `source_id`, `target_id`,
   `edge_type`, `direction`), `relationship_types`, `hops`, `is_seed`, `sources`
-  (`document_id` + metadata), and `truncated`. `page_content` is a deterministic
+  (`document_id` + metadata), and truncation flags. `page_content` is a deterministic
   entity rendering plus linked source text, capped by `max_content_chars`.
 
 Caps: `len(hops) <= 8`, `1 <= sample_size <= 100`, plus `max_seeds`, `max_paths`,
@@ -117,8 +117,17 @@ Caps: `len(hops) <= 8`, `1 <= sample_size <= 100`, plus `max_seeds`, `max_paths`
 absent seeds are skipped and metadata stays JSON-safe. Ordering is deterministic
 (seeds first, then sorted IDs) and is **not** a relevance ranking; no database
 ordering is promised. The retriever only reads, never fabricates entities, never
-writes, and never rebuilds indexes: stale `edge_type` indexes fail closed. Seeding
+writes, and never rebuilds indexes. Typed adjacency stays usable during deferred
+edge ingest; indexed seeding fails closed on stale node-label/property indexes. Seeding
 through an external vector store does not make this package a vector store.
+
+`result_truncated` marks seed/path/entity caps across the run and is copied onto
+every document. `content_truncated` and `sources_truncated` mark per-document
+clipping; `truncated` is their union. Sampling is intentional selection, not
+flagged truncation. Setting `max_sources_per_entity=0` disables source lookup.
+Caps bound returned entities/content, not execution, intermediate memory or total
+metadata size. Indexed seed candidates are consumed incrementally, with one extra
+valid seed to detect truncation.
 
 ## Claim (epistemic) tools
 
