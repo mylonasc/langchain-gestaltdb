@@ -5,7 +5,14 @@ import pytest
 from langchain_core.tools import BaseTool
 from langchain_tests.unit_tests.tools import ToolsUnitTests
 
-from langchain_gestaltdb import GestaltDBGraph, GestaltDBQueryTool, GestaltDBSchemaTool
+from langchain_gestaltdb import (
+    GestaltDBClaimExplanationTool,
+    GestaltDBClaimSearchTool,
+    GestaltDBClaimStatusTool,
+    GestaltDBGraph,
+    GestaltDBQueryTool,
+    GestaltDBSchemaTool,
+)
 
 
 class TestQueryToolStandard(ToolsUnitTests):
@@ -36,3 +43,38 @@ class TestSchemaToolStandard(TestQueryToolStandard):
     @property
     def tool_invoke_params_example(self) -> dict:
         return {}
+
+
+class TestClaimStatusToolStandard(TestQueryToolStandard):
+    @property
+    def tool_constructor(self) -> type[BaseTool]:
+        return GestaltDBClaimStatusTool
+
+    @property
+    def tool_invoke_params_example(self) -> dict:
+        return {
+            "subject": "alice",
+            "predicate": "WORKS_FOR",
+            "object": "acme",
+            "valid_time": "2024-06-01T00:00:00Z",
+        }
+
+
+class TestClaimSearchToolStandard(TestQueryToolStandard):
+    @property
+    def tool_constructor(self) -> type[BaseTool]:
+        return GestaltDBClaimSearchTool
+
+    @property
+    def tool_invoke_params_example(self) -> dict:
+        return {"subject": "alice", "valid_time": "2024-06-01T00:00:00Z"}
+
+
+class TestClaimExplanationToolStandard(TestQueryToolStandard):
+    @property
+    def tool_constructor(self) -> type[BaseTool]:
+        return GestaltDBClaimExplanationTool
+
+    @property
+    def tool_invoke_params_example(self) -> dict:
+        return {"claim_id": "claim:" + "0" * 64, "valid_time": "2024-06-01T00:00:00Z"}
