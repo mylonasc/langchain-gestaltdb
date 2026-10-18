@@ -1,5 +1,10 @@
 # langchain-gestaltdb
 
+[![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/mylonasc/langchain-gestaltdb/actions/workflows/ci.yml)
+
+<!-- Snapshot value; CI enforces >=90% package coverage in the Python matrix.
+     Automating this badge is tracked as TD-05 in TECH_DEBT.md. -->
+
 A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
 **In development:** the graph adapter, schema, ingestion, and read-only-default
 agent toolkit are available. See [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md)

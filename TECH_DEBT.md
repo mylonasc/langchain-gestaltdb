@@ -75,3 +75,17 @@ stay in `PROJECT_BOOTSTRAP_EPIC.md` instead.
 - Exit: cooperative cancellation or a process-isolated mode, with tested budget
   exhaustion, handle cleanup, persistent integrity, and measured limits.
 - Introducing documentation: BST-08 readiness PR (linked in #23).
+
+### TD-05 — Automated coverage badge / P2 / open
+
+- Issue: [#27](https://github.com/mylonasc/langchain-gestaltdb/issues/27).
+- Area: README coverage badge and CI coverage reporting.
+- Impact: the badge is a static snapshot and can drift from real coverage.
+- Reason: automating it needs a coverage service, CI egress, and a secret/app
+  install that current read-only, no-secret CI policy does not authorize.
+- Interim approach: CI enforces `--cov-fail-under=90` as the source of truth; the
+  README badge is a documented snapshot and all tests stay offline.
+- Owner: integration maintainers. Revisit when CI secret policy is reviewed.
+- Exit: an approved coverage service uploads results at least privilege and the
+  badge updates automatically; keep tests offline and drop the snapshot note.
+- Introduction: README coverage-badge change on the BST-09 review branch (#26).
