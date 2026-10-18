@@ -134,3 +134,26 @@ def test_backend_claim_writes_are_append_only(tmp_path: Path) -> None:
         assert corrected["logical_id"] == asserted["logical_id"]
         assert corrected["supersedes_version_id"] == asserted["version_id"]
         assert corrected["claim"]["provenance"] == {"document": "hr.csv"}
+        retracted = json.loads(
+            write_tools["gestaltdb_claim_retract"].invoke(
+                {
+                    "claim_id": asserted["logical_id"],
+                    "supersedes_version_id": corrected["version_id"],
+                }
+            )
+        )
+        assert retracted["written"] is True
+        assert retracted["claim"] is None
+        assert (
+            graph.graph.get_claim_as_of(
+                asserted["logical_id"],
+                valid_time="2024-06-01T00:00:00Z",
+            )
+            is None
+        )
+        historical = graph.graph.get_claim_as_of(
+            asserted["logical_id"],
+            valid_time="2024-06-01T00:00:00Z",
+            through_commit=asserted["commit_id"],
+        )
+        assert historical.version_id == asserted["version_id"]

@@ -72,6 +72,9 @@ def run_example(backend: str = "lmdb") -> dict[str, Any]:
                 return [item["claim"]["confidence"] for item in result["claims"]]
 
             return {
+                "writes_confirmed": all(
+                    version["written"] for version in (asserted, corrected, retracted)
+                ),
                 "fact_validity": asserted["valid"],
                 "knowledge_time": asserted["system_time"],
                 "validity_differs_from_knowledge_time": asserted["valid"]

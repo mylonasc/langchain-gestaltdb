@@ -186,15 +186,28 @@ metadata. Only filters and times are agent inputs: the graph, caps
 `max_chars`) are application-controlled. Output caps bound returned
 JSON, not execution time or memory.
 
+Status and evidence use one claim resolution; the status is computed before
+evidence truncation. Read-tool `max_chars` includes the complete response envelope.
+If metadata alone cannot fit, the read tool returns a bounded JSON `error` with
+`truncated: true` instead of silently clipping identities or times.
+Search treats omitted or null `object` as any object; null-literal filtering is
+not exposed by search (use status for a specific null-literal statement).
+Omitting every indexed filter scans the full claim catalog.
+
+### Opt-in claim writes
+
 Writing claims is explicitly opt-in. `GestaltDBClaimToolkit(graph=graph,
 allow_writes=True)` additionally returns append-only `gestaltdb_claim_assert`,
 `gestaltdb_claim_correct` and `gestaltdb_claim_retract` tools; the default
-toolkit never exposes them. Assertions require an explicit agent, polarity and
-fact-validity start; corrections and retractions require an exact superseded
-version or validity interval. Agent authority, provenance and confidence are
-never inferred, nothing is deleted, and every write returns the new version with
-fact validity (`valid`) kept separate from system knowledge time (`system_time`).
-Prior versions stay retrievable through `through_commit`/`system_time`.
+toolkit never exposes them. Direct construction of a write tool also opts in.
+Assertions require explicit agent, polarity, JSON provenance (`{}` if unavailable),
+and fact-validity start. Corrections and retractions require an exact
+`supersedes_version_id`; optional validity overrides use timezone-aware ISO-8601
+instants with an exclusive end after the start. Agent authority and confidence
+are never inferred. These tools grant write capability, not agent authentication
+or per-claim authorization: trusted applications must enforce those policies.
+Nothing is deleted. Fact validity (`valid`) stays separate from system knowledge
+time (`system_time`); prior versions remain retrievable with historical horizons.
 
 ```python
 # write, correct and retract tools (opt-in):
@@ -209,13 +222,14 @@ Prior versions stay retrievable through `through_commit`/`system_time`.
 # retract_tool.invoke({"claim_id": "claim:...", "supersedes_version_id": "uuid",
 #                      "reason": "employment ended", "valid_from": "2024-05-01T00:00:00Z"})
 ```
-Status and evidence use one claim resolution; the status is computed before
-evidence truncation. `max_chars` includes the complete response envelope. If
-metadata alone cannot fit, the tool returns a bounded JSON `error` with
-`truncated: true` instead of silently clipping identities or times.
-Search treats omitted or null `object` as any object; null-literal filtering is
-not exposed by search (use status for a specific null-literal statement).
-Omitting every indexed filter scans the full claim catalog.
+
+Successful writes return JSON with `written: true` and the new version. If the
+full payload cannot fit `max_chars` (or cannot be serialized), the response is a
+compact success receipt containing `version_id`, `logical_id`, and
+`truncated: true`, not a failure. Do not retry a committed write merely because
+its payload was omitted. Backend errors are redacted and may have uncertain
+outcomes; reconcile stored state before retrying. Backend transaction guarantees
+are unchanged, and an exact version target is not a latest-version compare-and-swap.
 
 ## Development
 

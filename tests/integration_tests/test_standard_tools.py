@@ -96,6 +96,7 @@ class TestClaimAssertToolStandard(TestQueryToolStandard):
             "object": "acme",
             "polarity": "positive",
             "agent": "test-agent",
+            "provenance": {},
             "valid_from": "2024-01-01T00:00:00Z",
         }
 

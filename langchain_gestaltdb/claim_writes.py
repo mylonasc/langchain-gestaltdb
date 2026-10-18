@@ -11,12 +11,15 @@ and prior evidence remains retrievable. There is no delete path.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any, Literal
 
+from gestaltdb.versioning import ClaimVersion
 from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool, ToolException
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
+from langchain_gestaltdb._serialization import normalize
 from langchain_gestaltdb.claims import _serialize_claim_version
 from langchain_gestaltdb.graph import GestaltDBGraph
 
@@ -26,13 +29,44 @@ _CLAIM_WRITE_ERROR = (
 )
 
 
-class ClaimAssertInput(BaseModel):
-    """Assertion inputs; agent/provenance/polarity are explicit, never inferred."""
+class _ValidityInput(BaseModel):
+    """Explicit timezone-aware, nonempty half-open fact-validity intervals."""
 
     model_config = ConfigDict(extra="forbid")
+    valid_from: str | None = Field(
+        default=None, max_length=64, description="ISO-8601 validity start with timezone"
+    )
+    valid_to: str | None = Field(
+        default=None, max_length=64, description="ISO-8601 exclusive validity end with timezone"
+    )
+
+    @field_validator("valid_from", "valid_to")
+    @classmethod
+    def validate_instant(cls, value: str | None) -> str | None:
+        if value is not None:
+            instant = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if instant.tzinfo is None:
+                raise ValueError("validity instants require an explicit timezone")
+        return value
+
+    @model_validator(mode="after")
+    def validate_interval(self) -> _ValidityInput:
+        if self.valid_to is not None:
+            if self.valid_from is None:
+                raise ValueError("valid_to requires valid_from")
+            start = datetime.fromisoformat(self.valid_from.replace("Z", "+00:00"))
+            end = datetime.fromisoformat(self.valid_to.replace("Z", "+00:00"))
+            if end <= start:
+                raise ValueError("valid_to must be after valid_from")
+        return self
+
+
+class ClaimAssertInput(_ValidityInput):
+    """Assertion inputs; agent/provenance/polarity are explicit, never inferred."""
+
     subject: str = Field(min_length=1, max_length=1024, description="Claim subject entity ID")
     predicate: str = Field(min_length=1, max_length=1024, description="Asserted predicate")
-    object: Any = Field(
+    object: JsonValue = Field(
         description="Object entity ID, or a JSON literal when object_kind='literal'"
     )
     polarity: Literal["positive", "negative"] = Field(description="Assert or deny")
@@ -41,56 +75,61 @@ class ClaimAssertInput(BaseModel):
     source: str | None = Field(default=None, max_length=1024, description="Evidence source")
     confidence: float | None = Field(default=None, ge=0, le=1, description="Explicit confidence")
     world: str = Field(default="default", min_length=1, max_length=1024)
-    provenance: dict[str, Any] = Field(
-        default_factory=dict, description="Explicit JSON provenance; never inferred"
+    provenance: dict[str, JsonValue] = Field(
+        description="Explicit JSON provenance (use {} if unavailable); never inferred"
     )
     valid_from: str = Field(
         min_length=1, max_length=64, description="ISO-8601 fact-validity start (required)"
     )
-    valid_to: str | None = Field(default=None, description="ISO-8601 fact-validity end")
+
+    @field_validator("object", "provenance")
+    @classmethod
+    def validate_json(cls, value: Any) -> Any:
+        normalize(value)  # Reject non-finite numbers and unsafe nested values before writing.
+        return value
+
+    @model_validator(mode="after")
+    def validate_entity_object(self) -> ClaimAssertInput:
+        if self.object_kind == "entity" and (not isinstance(self.object, str) or not self.object):
+            raise ValueError("entity objects require a nonempty string ID")
+        return self
 
 
-class ClaimCorrectInput(BaseModel):
+class ClaimCorrectInput(_ValidityInput):
     """Correction inputs; a change must be explicit and never inferred."""
 
-    model_config = ConfigDict(extra="forbid")
     claim_id: str = Field(min_length=1, max_length=256, description="claim:... identity to correct")
     supersedes_version_id: str = Field(
         min_length=1, max_length=64, description="Exact historical version being superseded"
     )
     confidence: float | None = Field(default=None, ge=0, le=1)
-    provenance: dict[str, Any] | None = Field(default=None, description="Replacement provenance")
-    valid_from: str | None = Field(default=None, description="ISO-8601 fact-validity start")
-    valid_to: str | None = Field(default=None, description="ISO-8601 fact-validity end")
+    provenance: dict[str, JsonValue] | None = Field(
+        default=None, description="Replacement provenance"
+    )
+
+    @field_validator("provenance")
+    @classmethod
+    def validate_json(cls, value: Any) -> Any:
+        normalize(value)
+        return value
 
     @model_validator(mode="after")
     def require_change(self) -> ClaimCorrectInput:
-        if self.valid_to is not None and self.valid_from is None:
-            raise ValueError("valid_to requires valid_from")
         if self.confidence is None and self.provenance is None and self.valid_from is None:
             raise ValueError("a correction must change confidence, provenance or validity")
         return self
 
 
-class ClaimRetractInput(BaseModel):
+class ClaimRetractInput(_ValidityInput):
     """Retraction inputs; history is preserved, never deleted."""
 
-    model_config = ConfigDict(extra="forbid")
     claim_id: str = Field(min_length=1, max_length=256, description="claim:... identity to retract")
-    supersedes_version_id: str | None = Field(
-        default=None, max_length=64, description="Historical version being withdrawn"
+    supersedes_version_id: str = Field(
+        min_length=1,
+        max_length=64,
+        description="Exact historical version being withdrawn (required)",
     )
     reason: str | None = Field(default=None, max_length=1024, description="Explicit reason")
-    valid_from: str | None = Field(default=None, description="ISO-8601 retraction start")
-    valid_to: str | None = Field(default=None, description="ISO-8601 retraction end")
-
-    @model_validator(mode="after")
-    def require_target(self) -> ClaimRetractInput:
-        if self.valid_to is not None and self.valid_from is None:
-            raise ValueError("valid_to requires valid_from")
-        if self.supersedes_version_id is None and self.valid_from is None:
-            raise ValueError("a retraction needs a superseded version or a validity start")
-        return self
 
 
 class _ClaimWriteTool(BaseTool):
@@ -100,13 +139,24 @@ class _ClaimWriteTool(BaseTool):
     max_chars: int = Field(default=16_000, ge=256, le=1_000_000, exclude=True)
     handle_tool_error: bool = True
 
-    def _result(self, version: Any) -> str:
-        output = json.dumps(_serialize_claim_version(version), ensure_ascii=False)
-        if len(output) > self.max_chars:
-            raise ToolException(
-                "Claim write exceeded the output limit; reduce provenance or property size."
-            )
-        return output
+    def _result(self, version: ClaimVersion) -> str:
+        # A commit already happened. Never turn a formatting limit into an
+        # apparent write failure that could prompt an unsafe retry.
+        receipt = {
+            "written": True,
+            "version_id": version.version_id,
+            "logical_id": version.logical_id,
+            "truncated": True,
+        }
+        try:
+            result = _serialize_claim_version(version)
+            result.update(written=True, truncated=False)
+            output = json.dumps(result, ensure_ascii=False)
+            if len(output) <= self.max_chars:
+                return output
+        except (TypeError, ValueError):
+            pass  # Preserve the successful receipt even if full serialization fails.
+        return json.dumps(receipt, ensure_ascii=False)
 
 
 class GestaltDBClaimAssertTool(_ClaimWriteTool):
@@ -128,11 +178,11 @@ class GestaltDBClaimAssertTool(_ClaimWriteTool):
         polarity: Literal["positive", "negative"],
         agent: str,
         valid_from: str,
+        provenance: dict[str, Any],
         object_kind: Literal["entity", "literal"] = "entity",
         source: str | None = None,
         confidence: float | None = None,
         world: str = "default",
-        provenance: dict[str, Any] | None = None,
         valid_to: str | None = None,
         run_manager: CallbackManagerForToolRun | None = None,
     ) -> str:
@@ -146,7 +196,7 @@ class GestaltDBClaimAssertTool(_ClaimWriteTool):
                 source=source,
                 confidence=confidence,
                 world=world,
-                provenance=provenance if provenance is not None else {},
+                provenance=provenance,
                 object_kind=object_kind,
                 valid_from=valid_from,
                 valid_to=valid_to,
@@ -187,6 +237,8 @@ class GestaltDBClaimCorrectTool(_ClaimWriteTool):
                 kwargs["valid_from"] = valid_from
             if valid_to is not None:
                 kwargs["valid_to"] = valid_to
+            # Use the logical ID: the Claim-object overload ignores explicit
+            # confidence/provenance on GestaltDB 0.12.0 (upstream issue #110).
             version = self.graph.graph.correct_claim(claim_id, **kwargs)
         except Exception:
             raise ToolException(_CLAIM_WRITE_ERROR) from None
@@ -198,8 +250,8 @@ class GestaltDBClaimRetractTool(_ClaimWriteTool):
 
     name: str = "gestaltdb_claim_retract"
     description: str = (
-        "Append a bitemporal retraction that withdraws a claim over an explicit validity "
-        "interval or superseded version, preserving all history. Writes are opt-in; nothing "
+        "Append a bitemporal retraction superseding an exact historical version, optionally "
+        "over an explicit validity interval, preserving history. Writes are opt-in; nothing "
         "is deleted and nothing is inferred."
     )
     args_schema: type[BaseModel] = ClaimRetractInput
@@ -207,16 +259,16 @@ class GestaltDBClaimRetractTool(_ClaimWriteTool):
     def _run(
         self,
         claim_id: str,
-        supersedes_version_id: str | None = None,
+        supersedes_version_id: str,
         reason: str | None = None,
         valid_from: str | None = None,
         valid_to: str | None = None,
         run_manager: CallbackManagerForToolRun | None = None,
     ) -> str:
         try:
-            kwargs: dict[str, Any] = {}
-            if supersedes_version_id is not None:
-                kwargs["supersedes_version_id"] = supersedes_version_id
+            # Exact-version targeting avoids orphan interval-only retractions
+            # accepted upstream in 0.12.0 (issue #111).
+            kwargs: dict[str, Any] = {"supersedes_version_id": supersedes_version_id}
             if reason is not None:
                 kwargs["reason"] = reason
             if valid_from is not None:
