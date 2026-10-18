@@ -12,19 +12,19 @@ tools, and explicitly enabled claim writes are available. See
 [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md) and the
 [technical debt register](TECH_DEBT.md).
 
-PyRex/RocksDB (`pyrex-rocksdb`, GestaltDB backend name `pyrex`) is the default
-in the development version: a plain install includes it and `GestaltDBGraph.create(path)`
-selects it. This default change is **not yet released**. Published 0.1.0 supports
-PyRex via the `rocksdb` extra and requires explicit backend selection:
+Since 0.1.1, PyRex/RocksDB (`pyrex-rocksdb`, GestaltDB backend name `pyrex`) is
+the default: a plain install includes it and `GestaltDBGraph.create(path)` selects
+it. Existing stores still reopen with their persisted backend. Version 0.1.0
+required the `rocksdb` extra and explicit `backend="pyrex"`.
 
 ```bash
-pip install 'langchain-gestaltdb[rocksdb]==0.1.0'
+pip install 'langchain-gestaltdb==0.1.1'
 ```
 
 ```python
 from langchain_gestaltdb import GestaltDBGraph
 
-with GestaltDBGraph.create("my-graph", backend="pyrex") as graph:
+with GestaltDBGraph.create("my-graph") as graph:
     rows = graph.query("MATCH (n) WHERE n.id = $id RETURN n", {"id": "alice"})
 ```
 

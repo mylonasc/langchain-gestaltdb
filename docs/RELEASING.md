@@ -8,6 +8,9 @@ GitHub Release does not upload packages. Each publication requires explicit
 maintainer authorization and approval of the `pypi` GitHub environment.
 The maintainer authorized the first release, **0.1.0 including BST-11 / PR #31**.
 No later release is authorized by that one-off approval.
+The maintainer subsequently authorized merging #35 and publishing the PyRex
+default change as **0.1.1** (tracked in #36). This is another one-off approval;
+later releases still need separate authorization.
 
 The workflow never rebuilds: it downloads the wheel/sdist retained by the exact
 main-push CI run, after installed-wheel tests passed, and requires that run's

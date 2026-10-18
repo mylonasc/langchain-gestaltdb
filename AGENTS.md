@@ -100,7 +100,8 @@ not an arbitrary status publisher.
 ## Release policy — explicit approval and Trusted Publishing
 
 - Merging code never authorizes publication. Each release needs explicit maintainer
-  authorization; the maintainer authorized the first release **0.1.0 including #31**.
+  authorization; the maintainer authorized **0.1.0 including #31** and subsequently
+  **0.1.1 including the PyRex-default change in #35**. Neither approves future releases.
 - Use `.github/workflows/publish.yml`, manually dispatched on main with the exact
   stable `X.Y.Z` version. Version changes require a PR and `uv lock`; tags are `vX.Y.Z`.
 - Publish the artifacts tested by successful exact-main CI, using PyPI Trusted
