@@ -5,6 +5,11 @@ from __future__ import annotations
 from langchain_core.tools import BaseTool, BaseToolkit
 from pydantic import ConfigDict, Field, StrictBool
 
+from langchain_gestaltdb.claim_writes import (
+    GestaltDBClaimAssertTool,
+    GestaltDBClaimCorrectTool,
+    GestaltDBClaimRetractTool,
+)
 from langchain_gestaltdb.claims import (
     GestaltDBClaimExplanationTool,
     GestaltDBClaimSearchTool,
@@ -39,15 +44,18 @@ class GestaltDBToolkit(BaseToolkit):
 
 
 class GestaltDBClaimToolkit(BaseToolkit):
-    """Read-only epistemic claim toolkit; never writes to the graph.
+    """Epistemic claim toolkit; writes require explicit trusted opt-in.
 
     Claims are separate from mutable graph edges, so these tools read the
     bitemporal epistemic API directly rather than executing Cypher. Construction
-    bounds are application-controlled and cannot be changed by an agent.
+    bounds are application-controlled and cannot be changed by an agent. The
+    default toolkit is read-only; ``allow_writes=True`` additionally exposes
+    append-only assertion, correction and retraction tools.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     graph: GestaltDBGraph = Field(exclude=True)
+    allow_writes: StrictBool = Field(default=False, exclude=True)
     max_evidence: int = Field(default=50, ge=1, le=1000, exclude=True)
     max_claims: int = Field(default=50, ge=1, le=1000, exclude=True)
     max_depth: int = Field(default=64, ge=0, le=1000, exclude=True)
@@ -57,7 +65,7 @@ class GestaltDBClaimToolkit(BaseToolkit):
 
     def get_tools(self) -> list[BaseTool]:
         """Construct tools without transferring ownership of the graph handle."""
-        return [
+        tools: list[BaseTool] = [
             GestaltDBClaimStatusTool(
                 graph=self.graph, max_evidence=self.max_evidence, max_chars=self.max_chars
             ),
@@ -72,3 +80,12 @@ class GestaltDBClaimToolkit(BaseToolkit):
                 max_chars=self.max_chars,
             ),
         ]
+        if self.allow_writes:
+            tools.extend(
+                [
+                    GestaltDBClaimAssertTool(graph=self.graph, max_chars=self.max_chars),
+                    GestaltDBClaimCorrectTool(graph=self.graph, max_chars=self.max_chars),
+                    GestaltDBClaimRetractTool(graph=self.graph, max_chars=self.max_chars),
+                ]
+            )
+        return tools
