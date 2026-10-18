@@ -134,6 +134,21 @@ BST-01 and BST-02 may be delivered jointly in the initial bootstrap PR; all othe
 dependencies remain normal merge prerequisites. Schema, ingestion, and safety
 can proceed independently after the graph contract is stable.
 
+### Initial delivery evidence (not completion)
+
+[PR #14](https://github.com/mylonasc/langchain-gestaltdb/pull/14) delivers the
+foundation and CI/policy checkpoints jointly. Its initial
+[CI run](https://github.com/mylonasc/langchain-gestaltdb/actions/runs/39124002820)
+passed all eight checks: quality, four Python versions, minimum direct
+dependencies, installed wheel, and the aggregate gate. Later PR commits must
+pass their own checks before merging; this link is historical evidence only.
+
+Main protection is configured remotely with strict status checks bound to the
+GitHub Actions app, administrator enforcement, PRs, resolved conversations,
+linear history, and disabled force-push/deletion. Squash is the only enabled
+merge method, and merged branches are automatically deleted. The initial
+PR and all issue checkpoints remain open for maintainer review and merge.
+
 ## CI, branch, and PR contract
 
 See [AGENTS.md](AGENTS.md) for the operational instructions. In brief:

@@ -80,6 +80,8 @@ CI uses read-only repository permissions and no publishing secrets. Never run
 untrusted PR code via `pull_request_target` or grant write permissions to test jobs.
 Do not rename `CI gate` without coordinating the protected-main status context.
 The YAML gate's check-run name is `CI gate`, not `CI / CI gate` in the API.
+Its protected-main requirement is bound to the GitHub Actions app (ID 15368),
+not an arbitrary status publisher.
 
 ## Release policy — publishing pipeline deferred
 
