@@ -7,7 +7,8 @@
 
 A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
 **In development:** the graph adapter, schema, ingestion, read-only-default
-agent toolkit, and read-only claim status/provenance tools are available. See
+agent toolkit, bounded typed-graph retriever, and read-only claim status/provenance
+tools are available. See
 [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md) and the
 [technical debt register](TECH_DEBT.md).
 
@@ -111,6 +112,50 @@ Tool-facing backend errors are redacted; low-level graph errors still propagate.
 Treat graph/source text as untrusted data, not instructions. Read-only prevents
 writes but does not bound execution cost, intermediate memory, or result collection.
 LangChain's async tool adapter offloads synchronous work; no native async is claimed.
+
+### Bounded graph retrieval
+
+```python
+from langchain_gestaltdb import GestaltDBRetriever, RetrievalHop
+
+retriever = GestaltDBRetriever(
+    graph=graph,  # must stay open for the retriever's lifetime
+    seed_label="Person",  # indexed entity resolution
+    seed_property="name",  # requires create_node_property_index("name")
+    hops=(RetrievalHop(edge_type="WORKS_FOR", direction="out", sample_size=5),),
+)
+# documents = retriever.invoke("Alice")
+```
+
+`GestaltDBRetriever` is a `BaseRetriever`, not a vector store. Configure exactly
+one seed strategy: `seed_ids` (explicit), `seed_resolver` (a callable such as an
+external vector-store lookup returning node IDs), or the indexed
+`seed_label`/`seed_property` pair. Indexed resolution matches the query string
+exactly against the indexed property value, so create that property index first;
+non-string properties and fuzzy matching need a resolver or explicit seeds.
+Absent seeds are skipped rather than fabricated, and an empty graph yields `[]`.
+
+Each returned `Document` preserves the entity `id`/labels/properties, the
+normalized traversal `paths` (with `edge_id`, `source_id`, `target_id`,
+`edge_type`, `direction`), distinct `relationship_types`, `hops`, and `sources`
+(`document_id` plus metadata) linked through `MENTIONS` when
+`include_sources=True`. Labels often carry the evidence text. Byte IDs are
+decoded to strings and all metadata stays JSON-safe.
+
+Traversal is bounded: at most 8 `hops`, `sample_size` of 1–100 per hop,
+`max_paths`, `max_entities`, and `max_content_chars`. `max_seeds` bounds
+resolution. `result_truncated` is a run-level flag for seed/path/entity caps,
+copied onto every returned document. `content_truncated` and `sources_truncated`
+describe per-document clipping; `truncated` is true if any of these flags is true.
+Sampling intentionally selects a subset and does not set these flags. Output ordering is deterministic (seeds first, then
+sorted IDs) but is **not** a relevance ranking, and no database ordering is
+promised. The retriever only reads; it never writes or rebuilds indexes. Typed
+adjacency remains usable during deferred edge ingestion; indexed seeding rejects
+stale node-label/property indexes until explicitly rebuilt. External vector
+search may supply seeds without making this package a vector store.
+
+Caps bound returned entities and content, not database work or total metadata
+size. Resolvers, property normalization, and source lookup may still be costly.
 
 ### Claim status and provenance tools
 
