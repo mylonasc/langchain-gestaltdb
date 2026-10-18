@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "langchain-gestaltdb"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "A graph-first LangChain integration for GestaltDB"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -43,7 +43,7 @@ core-metadata-version = "2.4"
 
 [tool.hatch.build.targets.sdist]
 core-metadata-version = "2.4"
-include = ["/langchain_gestaltdb", "/tests", "/examples", "/docs", "/README.md", "/LICENSE", "/pyproject.toml"]
+include = ["/langchain_gestaltdb", "/tests", "/examples", "/docs", "/scripts", "/.github/workflows", "/CHANGELOG.md", "/README.md", "/LICENSE", "/pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
