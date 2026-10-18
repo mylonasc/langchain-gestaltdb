@@ -2,9 +2,9 @@
 
 A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
 **In development:** the graph adapter, schema, ingestion, read-only-default
-agent toolkit, and read-only claim status/provenance tools are available. See
-[the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md) and the
-[technical debt register](TECH_DEBT.md).
+agent toolkit, read-only claim status/provenance tools, and explicitly enabled
+claim writes are available. See [the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md)
+and the [technical debt register](TECH_DEBT.md).
 
 ```python
 from langchain_gestaltdb import GestaltDBGraph
@@ -112,7 +112,7 @@ LangChain's async tool adapter offloads synchronous work; no native async is cla
 GestaltDB claims are sourced assertions or denials in a bitemporal epistemic
 layer. They are **not** graph edges: they do not create current-state edges and
 never appear in Cypher results or `MATCH` patterns. `GestaltDBClaimToolkit`
-exposes read-only, bounded tools for them and exposes no write path.
+exposes read-only, bounded tools for them; writes require explicit opt-in (below).
 
 ```python
 from langchain_gestaltdb import GestaltDBClaimToolkit
@@ -136,6 +136,30 @@ metadata. Only filters and times are agent inputs: the graph, caps
 `max_chars`) and horizons are application-controlled. Output caps bound returned
 JSON, not execution time or memory.
 
+Writing claims is explicitly opt-in. `GestaltDBClaimToolkit(graph=graph,
+allow_writes=True)` additionally returns append-only `gestaltdb_claim_assert`,
+`gestaltdb_claim_correct` and `gestaltdb_claim_retract` tools; the default
+toolkit never exposes them. Assertions require an explicit agent, polarity and
+fact-validity start; corrections and retractions require an exact superseded
+version or validity interval. Agent authority, provenance and confidence are
+never inferred, nothing is deleted, and every write returns the new version with
+fact validity (`valid`) kept separate from system knowledge time (`system_time`).
+Prior versions stay retrievable through `through_commit`/`system_time`.
+
+```python
+# write, correct and retract tools (opt-in):
+# status, search, explain, assert_tool, correct_tool, retract_tool = \
+#     GestaltDBClaimToolkit(graph=graph, allow_writes=True).get_tools()
+# assert_tool.invoke({"subject": "alice", "predicate": "WORKS_FOR", "object": "acme",
+#                     "polarity": "positive", "agent": "source:hr",
+#                     "provenance": {"document": "hr.csv"},
+#                     "valid_from": "2024-01-01T00:00:00Z"})
+# correct_tool.invoke({"claim_id": "claim:...", "supersedes_version_id": "uuid",
+#                      "confidence": 0.9})
+# retract_tool.invoke({"claim_id": "claim:...", "supersedes_version_id": "uuid",
+#                      "reason": "employment ended", "valid_from": "2024-05-01T00:00:00Z"})
+```
+
 ## Development
 
 Run the complete offline ingest → schema → tool-call → source-evidence example:
@@ -148,6 +172,12 @@ Run the offline claim status/contradiction/provenance example:
 
 ```bash
 uv run --locked python examples/claim_agent.py
+```
+
+Run the offline opt-in claim-write example (fact validity vs system knowledge time):
+
+```bash
+uv run --locked python examples/claim_writes.py
 ```
 
 No model, API key, database server, or network service is required. The scripted

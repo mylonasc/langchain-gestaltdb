@@ -16,7 +16,10 @@ Import from `langchain_gestaltdb`:
 | `GestaltDBClaimStatusTool` | Read-only four-valued claim status with bounded evidence |
 | `GestaltDBClaimSearchTool` | Read-only indexed historical claim search |
 | `GestaltDBClaimExplanationTool` | Bounded claim/rule derivation graph with truncation |
-| `GestaltDBClaimToolkit` | Consistently configured read-only claim tools |
+| `GestaltDBClaimToolkit` | Consistently configured claim tools (read-only by default) |
+| `GestaltDBClaimAssertTool` | Opt-in append-only sourced assertion/denial |
+| `GestaltDBClaimCorrectTool` | Opt-in append-only claim correction |
+| `GestaltDBClaimRetractTool` | Opt-in append-only claim retraction |
 | `ReadOnlyQueryError` | Query could not be proven read-only |
 
 `GraphDocument.from_external(model_or_mapping)` validates equivalent fields
@@ -95,7 +98,8 @@ ingestion deliberately uses incremental object writes. See `TECH_DEBT.md`.
 Claims are sourced assertions/denials in a bitemporal epistemic layer, distinct
 from mutable graph edges: they create no current-state edges and never appear in
 Cypher matching. `GestaltDBClaimToolkit(graph=graph)` returns three read-only
-tools that call the epistemic API directly; no write path is exposed.
+tools that call the epistemic API directly; the default toolkit exposes no write
+path (writes require explicit opt-in, below).
 
 - `gestaltdb_claim_status` reports `supported`/`refuted`/`both`/`unknown` with
   bounded supporting and refuting evidence for one statement.
@@ -114,6 +118,21 @@ keep statement/claim/logical/version ids, commit metadata, valid interval, syste
 time, operation, payload hash and provenance. As with query output, caps bound
 returned JSON, not execution time, intermediate memory, or materialization.
 Tool-facing claim errors are redacted to a single generic message.
+
+Writing is explicitly opt-in. `GestaltDBClaimToolkit(graph=graph,
+allow_writes=True)` exposes append-only `gestaltdb_claim_assert`,
+`gestaltdb_claim_correct` and `gestaltdb_claim_retract`; the default toolkit never
+includes them, and they can also be constructed directly as the opt-in. Assertions
+require explicit `agent`, `polarity` and `valid_from`; corrections require a
+`supersedes_version_id` plus an explicit change (confidence, provenance or
+`valid_from`); retractions require a superseded version or a `valid_from`. Agent
+authority, provenance and confidence are never inferred, `valid_to` requires
+`valid_from`, and no delete path exists. Every write returns the appended version
+with fact validity (`valid`) distinct from system knowledge time (`system_time`)
+and a `supersedes_version_id` link; prior versions remain retrievable. Identity is
+enforced upstream: a correction whose `claim_id` does not match the superseded
+version's logical id fails closed. Write output exceeding the configured cap
+returns an actionable error.
 
 ## Tested platform and non-goals
 
