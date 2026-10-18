@@ -60,3 +60,18 @@ stay in `PROJECT_BOOTSTRAP_EPIC.md` instead.
 - Owner: integration maintainers. Revisit on every GestaltDB upgrade.
 - Exit: verify a public upstream classifier against the adversarial suite before
   replacing the isolated adapter. Write prevention itself is not deferred.
+
+### TD-04 — Cancellable execution budgets / P1 / open
+
+- Issue: [#23](https://github.com/mylonasc/langchain-gestaltdb/issues/23).
+- Area: long-running reads and full result materialization, not output formatting.
+- Impact: expensive reads may exhaust time/memory despite read-only enforcement.
+- Reason: upstream lacks a cancellable adapter-level execution budget; unsafe
+  thread interruption would be worse than an explicit deployment limitation.
+- Interim approach: document trusted-application scope and require process/resource
+  isolation for hostile reads. Text/nesting/output caps are not advertised as
+  timeouts or intermediate-memory caps. No multitenant sandbox claim is made.
+- Owner: integration maintainers. Revisit before hosted/adversarial deployments.
+- Exit: cooperative cancellation or a process-isolated mode, with tested budget
+  exhaustion, handle cleanup, persistent integrity, and measured limits.
+- Introducing documentation: BST-08 readiness PR (linked in #23).

@@ -45,7 +45,48 @@ jobs:
           version: "0.12.21"
           enable-cache: true
       - run: uv sync --python '${{ matrix.python }}' --locked --group dev --extra lmdb
-      - run: uv run --locked pytest --cov=langchain_gestaltdb --cov-report=term-missing
+      - run: uv run --locked pytest --cov=langchain_gestaltdb --cov-report=term-missing --cov-fail-under=90
+
+  latest-dependencies:
+    name: Latest dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.21"
+          enable-cache: true
+      - run: uv sync --python 3.12 --group dev --extra lmdb --upgrade
+      - run: uv run --frozen pytest
+
+  additional-backends:
+    name: Backend (${{ matrix.backend }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: leveldb
+            extra: leveldb
+          - backend: pyrex
+            extra: rocksdb
+    env:
+      GESTALTDB_TEST_BACKEND: ${{ matrix.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LevelDB native library
+        if: matrix.backend == 'leveldb'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libleveldb-dev
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.21"
+          enable-cache: true
+      - run: uv sync --python 3.12 --locked --group dev --extra lmdb --extra '${{ matrix.extra }}'
+      - run: uv run --locked pytest tests/integration_tests/test_backend_contract.py
 
   minimum-dependencies:
     name: Minimum direct dependencies
@@ -87,7 +128,7 @@ jobs:
   gate:
     name: CI gate
     if: always()
-    needs: [quality, tests, minimum-dependencies, distribution]
+    needs: [quality, tests, minimum-dependencies, latest-dependencies, additional-backends, distribution]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

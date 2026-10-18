@@ -74,15 +74,20 @@ with no path filters that could leave the required gate pending. It includes:
 
 1. Ruff lint/format and strict package typing.
 2. Real embedded-database tests on Python 3.10, 3.11, 3.12, and 3.13.
-3. A fresh lowest-direct-dependency resolution on Python 3.10.
+3. Fresh lowest-direct dependencies on Python 3.10 and latest dependencies on 3.12.
 4. Wheel/sdist build and metadata validation, plus wheel-installed tests outside
    the source checkout.
-5. A stable `CI gate` that fails for failed, skipped, or cancelled prerequisites.
+5. LevelDB/PyRex contract tests on Linux/Python 3.12 with explicit native library
+   installation, plus executable offline example tests.
+6. A stable `CI gate` that fails for failed, skipped, or cancelled prerequisites.
 
 Use offline fixtures and fake models; never require paid model credentials in
 required CI. Add applicable `langchain-tests` suites as real components arrive.
 Tests must actually collect and run; do not hide missing backends with blanket skips.
-Optional backend jobs may have their own explicit availability policy later.
+The extra-backend jobs are required once configured; missing libraries fail
+visibly rather than silently skipping. Tests enforce >=90% package coverage.
+The standard tool suite is pinned to a Core-1.0-compatible baseline; do not raise
+the tested runtime floor accidentally by upgrading test-only dependencies.
 
 CI uses read-only repository permissions and no publishing secrets. Never run
 untrusted PR code via `pull_request_target` or grant write permissions to test jobs.

@@ -108,6 +108,16 @@ LangChain's async tool adapter offloads synchronous work; no native async is cla
 
 ## Development
 
+Run the complete offline ingest → schema → tool-call → source-evidence example:
+
+```bash
+uv run --locked python examples/graph_agent.py
+```
+
+No model, API key, database server, or network service is required. The scripted
+tool call demonstrates the same `ToolMessage` dispatch used by LangChain agents;
+it is not an LLM reasoning benchmark. See [the API contract](docs/API.md).
+
 Use Python 3.10–3.13 (3.12 recommended) and [uv](https://docs.astral.sh/uv/):
 
 ```bash
@@ -122,7 +132,9 @@ uv run --locked twine check dist/*
 
 The committed lockfile makes development reproducible; the dependency ranges
 in `pyproject.toml` describe the library's consumer contract. CI also exercises
-minimum direct dependencies. No external services or model API keys are needed.
+minimum/latest direct dependencies, real deferred-index behavior, and additional
+LevelDB/PyRex backend contracts on Linux/Python 3.12. All tests run offline and
+enforce at least 90% package coverage in the Python matrix.
 
 GestaltDB's base install has **no storage backend**. Development uses the `lmdb`
 extra and JSON serialization explicitly; `leveldb` and `rocksdb` extras are
