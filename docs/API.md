@@ -159,6 +159,33 @@ Caps bound returned entities/content, not execution, intermediate memory or tota
 metadata size. Indexed seed candidates are consumed incrementally, with one extra
 valid seed to detect truncation.
 
+## Multi-hop sampling tool
+
+`GestaltDBSamplingTool(graph, max_paths=50, max_nodes=1000, max_edges=2000,
+max_chars=16000, rng_seed=0)` (`gestaltdb_sample_paths`) wraps
+`sample_typed_paths`/`sample_typed_subgraph` over an ordered `SamplingPattern`.
+
+- Agent input: `seed_ids` (explicit node IDs), `hops` (ordered
+  `SamplingHopInput(edge_type, direction=out, sample_size=10)`, `direction`
+  `out`/`in`/`any`), and `mode` (`paths` or `subgraph`). Caps and `rng_seed`
+  are application-controlled.
+- `paths` mode returns decoded `paths` (`seed` plus `edge_id`/`source_id`/
+  `target_id`/`neighbor_id`/`edge_type`/`direction` steps) with
+  `returned_paths` and `truncated`. `subgraph` mode additionally returns
+  `nodes` (`id`/labels/properties) and `edges` (`id`/source/target/type/
+  properties) with their own counts; all lists share one `truncated` flag via
+  the bounded-JSON envelope.
+- Use the retriever for seeded entity documents with source text; use this tool
+  for raw multi-hop paths or a materialized subgraph without per-entity
+  documents or source linking.
+
+Caps: `len(hops) <= 8`, `1 <= sample_size <= 100`, plus `max_paths`,
+`max_nodes`, `max_edges`, `max_chars`. Absent seeds are skipped and never
+fabricated; output ordering is deterministic (sorted) and is **not** a
+relevance ranking. The tool only reads, never writes, and never rebuilds
+indexes; typed adjacency stays usable during deferred edge ingest. Caps bound
+returned output, not execution or intermediate materialization.
+
 ## Claim (epistemic) tools
 
 Claims are sourced assertions/denials in a bitemporal epistemic layer, distinct
