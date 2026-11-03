@@ -14,6 +14,7 @@ from langchain_gestaltdb.claims import (
 from langchain_gestaltdb.graph import GestaltDBGraph
 from langchain_gestaltdb.graph_document import GraphDocument, GraphNode, GraphRelationship
 from langchain_gestaltdb.index_advisor import GestaltDBIndexAdvisorTool, advise_index
+from langchain_gestaltdb.modal import GestaltDBEntailsTool, GestaltDBWorldAccessibilityTool
 from langchain_gestaltdb.retrievers import GestaltDBRetriever, RetrievalHop
 from langchain_gestaltdb.rules import (
     GestaltDBRuleCreateTool,
@@ -30,6 +31,7 @@ from langchain_gestaltdb.temporal_tools import (
 )
 from langchain_gestaltdb.toolkits import (
     GestaltDBClaimToolkit,
+    GestaltDBModalToolkit,
     GestaltDBRuleToolkit,
     GestaltDBTemporalToolkit,
     GestaltDBToolkit,
@@ -55,6 +57,8 @@ __all__ = [
     "GestaltDBClaimSearchTool",
     "GestaltDBClaimStatusTool",
     "GestaltDBClaimToolkit",
+    "GestaltDBEntailsTool",
+    "GestaltDBModalToolkit",
     "GestaltDBEdgeAsOfTool",
     "GestaltDBNodeAsOfTool",
     "GestaltDBTemporalScanTool",
@@ -69,6 +73,7 @@ __all__ = [
     "GestaltDBIndexAdvisorTool",
     "GestaltDBQueryTool",
     "GestaltDBSchemaTool",
+    "GestaltDBWorldAccessibilityTool",
     "advise_index",
     "GestaltDBVizTool",
     "VizDependencyError",
