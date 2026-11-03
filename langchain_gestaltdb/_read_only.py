@@ -44,8 +44,13 @@ def validate_read_only(query: str, allowed_procedures: Collection[str] = ()) -> 
 
     Recursively inspect every UNION branch and CALL subquery. Clause types are
     positively allowlisted, not matched by text. Procedures default to none and
-    only known read procedures can be enabled. This is not an execution budget,
-    a filesystem read-only handle, or protection against expensive reads.
+    only known read procedures can be enabled. ``SHOW INDEX``/``SHOW INDEXES``
+    and ``SHOW CONSTRAINTS`` are explicitly permitted as read-only schema
+    commands. ``CREATE CONSTRAINT``/``DROP CONSTRAINT`` are rejected here;
+    writes are gated by ``allow_writes`` at the tool/adapter layer, not by
+    this validator. ``kg.entails`` additionally requires ``world`` and
+    ``validTime`` options. This is not an execution budget, a filesystem
+    read-only handle, or protection against expensive reads.
     """
     allowed = frozenset(allowed_procedures)
     if allowed - set(_PROCEDURES.values()):
@@ -75,6 +80,12 @@ def validate_read_only(query: str, allowed_procedures: Collection[str] = ()) -> 
         elif kind in _PROCEDURES:
             if _PROCEDURES[kind] not in allowed:
                 raise ReadOnlyQueryError("Procedure is not allowlisted for read-only execution")
+            if kind is EntailsCall:
+                options = getattr(node, "options", None)
+                if not isinstance(options, dict) or not (
+                    "world" in options and "validTime" in options
+                ):
+                    raise ReadOnlyQueryError("kg.entails requires world and validTime options")
         else:
             raise ReadOnlyQueryError(f"Unsupported read-only query node: {kind.__name__}")
 
