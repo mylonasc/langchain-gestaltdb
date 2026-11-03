@@ -211,7 +211,11 @@ class GestaltDBClaimStatusTool(_ClaimTool):
             statement_id = claim_statement_id(subject, predicate, object, object_kind=object_kind)
             versions = list(
                 call_upstream(
-                    graph, "iter_claims_as_of", valid_time=valid_time, statement_id=statement_id, **filters
+                    graph,
+                    "iter_claims_as_of",
+                    valid_time=valid_time,
+                    statement_id=statement_id,
+                    **filters,
                 )
             )
             # Match upstream's four-valued policy, using the same resolution for
