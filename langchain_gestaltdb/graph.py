@@ -10,6 +10,7 @@ from typing import Any, cast
 
 from gestaltdb.graphdb import GraphDB
 
+from langchain_gestaltdb import _bulk
 from langchain_gestaltdb._ingestion import ingest
 from langchain_gestaltdb._read_only import validate_read_only
 from langchain_gestaltdb._schema import discover_schema
@@ -240,6 +241,108 @@ class GestaltDBGraph:
         """
         self._schema = None
         ingest(self.graph, graph_documents, include_source)
+
+    def ingest_polars(
+        self,
+        node_df: Any,
+        edge_df: Any,
+        *,
+        node_id: str = "node_id",
+        labels: Any = "labels",
+        node_property_columns: list[str] | tuple[str, ...] | None = None,
+        edge_id: str = "edge_id",
+        source: str = "source",
+        target: str = "target",
+        edge_type: str = "edge_type",
+        edge_property_columns: list[str] | tuple[str, ...] | None = None,
+        chunk_size: int = 100_000,
+        index_mode: Any = "defer_rebuild",
+    ) -> dict[str, Any]:
+        """Bulk-load Polars node/edge frames for trusted application code.
+
+        This is not an agent tool: agents must never call it directly. Frames
+        are validated before the first write and the schema cache is
+        invalidated, but no whole-import atomicity is promised: backend I/O
+        failures can leave a partial import.
+
+        ``index_mode`` is ``MAINTAIN`` (update indexes during ingest, slower),
+        ``DEFER`` (leave secondary indexes stale until the trusted app calls
+        ``graph.rebuild_deferred_indexes()``; indexed lookups fail closed while
+        stale), or ``DEFER_REBUILD`` (rebuild before returning; the default).
+
+        CSV pitfalls: declare explicit numeric dtypes when reading CSVs (for
+        example ``schema_overrides={"score": pl.Float64}``), and re-wrap a
+        string ``labels`` column into one list per row (bare strings would be
+        shredded into per-character labels). Returns the upstream counts with
+        ``nodes``, ``edges``, ``rebuilt_indexes`` and ``stale_indexes``.
+        """
+        self._schema = None
+        try:
+            return _bulk.ingest_polars_frames(
+                self.graph,
+                node_df,
+                edge_df,
+                node_id=node_id,
+                labels=labels,
+                node_property_columns=node_property_columns,
+                edge_id=edge_id,
+                source=source,
+                target=target,
+                edge_type=edge_type,
+                edge_property_columns=edge_property_columns,
+                chunk_size=chunk_size,
+                index_mode=index_mode,
+            )
+        finally:
+            self._schema = None
+
+    def ingest_arrow(
+        self,
+        node_ids: Any,
+        edge_ids: Any,
+        sources: Any,
+        targets: Any,
+        edge_types: Any,
+        *,
+        labels: Any = None,
+        node_properties: dict[str, Any] | None = None,
+        edge_properties: dict[str, Any] | None = None,
+        chunk_size: int = 100_000,
+        index_mode: Any = "defer_rebuild",
+    ) -> dict[str, Any]:
+        """Bulk-load Arrow-like node/edge columns for trusted application code.
+
+        This is not an agent tool: agents must never call it directly. Columns
+        are validated before the first write and the schema cache is
+        invalidated, but no whole-import atomicity is promised: backend I/O
+        failures can leave a partial import. Plain Python sequences work
+        without pyarrow installed; ``pa.Array`` inputs require it.
+
+        ``index_mode`` is ``MAINTAIN`` (update indexes during ingest, slower),
+        ``DEFER`` (leave secondary indexes stale until the trusted app calls
+        ``graph.rebuild_deferred_indexes()``; indexed lookups fail closed while
+        stale), or ``DEFER_REBUILD`` (rebuild before returning; the default).
+        Numeric columns need explicit dtypes (CSV text defaults to strings).
+        Returns the upstream counts with ``nodes``, ``edges``,
+        ``rebuilt_indexes`` and ``stale_indexes``.
+        """
+        self._schema = None
+        try:
+            return _bulk.ingest_arrow_columns(
+                self.graph,
+                node_ids,
+                edge_ids,
+                sources,
+                targets,
+                edge_types,
+                labels=labels,
+                node_properties=node_properties,
+                edge_properties=edge_properties,
+                chunk_size=chunk_size,
+                index_mode=index_mode,
+            )
+        finally:
+            self._schema = None
 
     def __enter__(self) -> GestaltDBGraph:
         _ = self.graph
