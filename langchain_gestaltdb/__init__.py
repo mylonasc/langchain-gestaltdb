@@ -13,6 +13,7 @@ from langchain_gestaltdb.claims import (
 )
 from langchain_gestaltdb.graph import GestaltDBGraph
 from langchain_gestaltdb.graph_document import GraphDocument, GraphNode, GraphRelationship
+from langchain_gestaltdb.index_advisor import GestaltDBIndexAdvisorTool, advise_index
 from langchain_gestaltdb.retrievers import GestaltDBRetriever, RetrievalHop
 from langchain_gestaltdb.rules import (
     GestaltDBRuleCreateTool,
@@ -55,8 +56,10 @@ __all__ = [
     "GestaltDBRuleRunTool",
     "GestaltDBRuleToolkit",
     "GestaltDBToolkit",
+    "GestaltDBIndexAdvisorTool",
     "GestaltDBQueryTool",
     "GestaltDBSchemaTool",
+    "advise_index",
     "GestaltDBVizTool",
     "VizDependencyError",
     "render_artifact",

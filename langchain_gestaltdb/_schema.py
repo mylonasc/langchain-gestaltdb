@@ -22,6 +22,10 @@ DIALECT_GUIDANCE = (
     "single-property UNIQUE/IS NOT NULL CREATE/DROP CONSTRAINT are write-gated. "
     "Supported procedures (allowlisted only): pg.sample_typed_paths and kg.entails; "
     "kg.entails requires world and validTime options. "
+    "Property indexes are explicit: the trusted application creates them with "
+    "create_node_property_index/create_edge_property_index and rebuilds deferred "
+    "ingests with rebuild_deferred_indexes(); use the gestaltdb_index_advisor tool to "
+    "check existence and staleness before relying on an index. "
     "Unsupported: pattern comprehensions, exists(pattern), GQL quantifiers, "
     "relationship or multi-property constraints, APOC and arbitrary procedures. "
     "Schema is sampled unless explicitly configured otherwise; "
@@ -107,6 +111,21 @@ def discover_schema(
             for label, props in sorted(values.items())
         }
 
+    stale: tuple[str, ...]
+    try:
+        stale = tuple(graph.stale_indexes())
+    except Exception:
+        stale = ()
+    try:
+        index_definitions = dict(graph.index_statistics())
+    except Exception:
+        index_definitions = {}
+    constraints: list[dict[str, Any]]
+    try:
+        constraints = [dict(record) for record in graph.query("SHOW CONSTRAINTS").records]
+    except Exception:
+        constraints = []
+
     return {
         "node_props": properties(node_props),
         "rel_props": properties(rel_props),
@@ -119,7 +138,11 @@ def discover_schema(
             "inspected_nodes": sum(node is not None for node in nodes.values()),
             "inspected_edges": sum(edge is not None for edge in edges),
             "truncated": nodes_truncated or edges_truncated,
-            "indexes": graph.index_statistics(),
+            "indexes": index_definitions,
+            "index_definitions": index_definitions,
+            "stale_indexes": sorted(stale),
+            "temporal_indexes_current": "temporal" not in stale,
+            "constraints": constraints,
             "dialect": DIALECT_GUIDANCE,
         },
     }
