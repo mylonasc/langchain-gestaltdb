@@ -168,6 +168,31 @@ search may supply seeds without making this package a vector store.
 Caps bound returned entities and content, not database work or total metadata
 size. Resolvers, property normalization, and source lookup may still be costly.
 
+### Multi-hop sampling tool
+
+```python
+from langchain_gestaltdb import GestaltDBSamplingTool
+
+tool = GestaltDBSamplingTool(graph=graph, rng_seed=7)  # caps are app-controlled
+# tool.invoke({"seed_ids": ["drug"], "mode": "paths", "hops": [
+#     {"edge_type": "TARGETS", "direction": "out", "sample_size": 2},
+#     {"edge_type": "ASSOCIATED_WITH", "direction": "out", "sample_size": 2}]})
+```
+
+Use `GestaltDBRetriever` for seeded entity documents with source-linked text
+(one `Document` per entity, `MENTIONS` provenance). Use `GestaltDBSamplingTool`
+(`gestaltdb_sample_paths`) for raw multi-hop typed paths or, with
+`mode="subgraph"`, a materialized subgraph of nodes/edges/paths following an
+ordered `SamplingPattern` (e.g. drug -> protein -> disease).
+
+Traversal is bounded: at most 8 hops, `sample_size` of 1–100 per hop, plus
+`max_paths`/`max_nodes`/`max_edges`/`max_chars`. `rng_seed` is
+application-controlled for reproducibility. Absent seeds are skipped, never
+fabricated. Byte IDs are decoded to strings; output order is deterministic
+(paths sorted, nodes/edges sorted by ID) and is **not** a relevance ranking.
+The tool is read-only: it never writes and never rebuilds indexes. Caps bound
+returned output, not database work or intermediate materialization.
+
 ### Claim status and provenance tools
 
 GestaltDB claims are sourced assertions or denials in a bitemporal epistemic

@@ -22,6 +22,9 @@ Import from `langchain_gestaltdb`:
 | `GestaltDBClaimAssertTool` | Opt-in append-only sourced assertion/denial |
 | `GestaltDBClaimCorrectTool` | Opt-in append-only claim correction |
 | `GestaltDBClaimRetractTool` | Opt-in append-only claim retraction |
+| `GestaltDBVizTool` | Opt-in offline visualization artifact tool (bounded summary) |
+| `render_artifact` | Trusted-app offline HTML/SVG artifact helper (bounded summary) |
+| `VizDependencyError` | Packaged `gestaltdb.viz` module is unavailable |
 | `ReadOnlyQueryError` | Query could not be proven read-only |
 
 `GraphDocument.from_external(model_or_mapping)` validates equivalent fields
@@ -62,8 +65,18 @@ sequence is described in `docs/AGENT_WORKFLOW.md`; deployment limits live in
   Opening existing stores is unaffected by the creation default; no migration
   from LMDB or LevelDB is performed.
 - `graph` accesses the raw database only while the wrapper is open.
+- `manifest` / `database_id` are read-only inspection properties; `index_statistics()`
+  reports persisted property-index definitions and `stale_indexes()` reports sorted
+  families needing `graph.rebuild_deferred_indexes()`. All four pass through to the
+  underlying handle and fail closed once the adapter is closed. No raw write
+  transaction is exposed; pin several reads with `adapter.graph.read_view(...)`
+  (temporal horizon) or `adapter.graph.current_read_view()` (backend snapshot).
 - `query(query, params=None, read_snapshot=None)` permits upstream reads/writes;
-  backend/parser errors propagate unchanged.
+  backend/parser errors propagate unchanged. `read_snapshot=None` snapshots
+  automatically where supported, `True` requires one, `False` opts out. LMDB
+  snapshots verifiably (MVCC); transactional PyRex (`backend_options=
+  {"transactional": True}`) pins reads without verifiable provenance; LevelDB and
+  default PyRex reject explicit snapshots with `NotImplementedError`.
 - `query_read_only(query, params=None, allowed_procedures=(), read_snapshot=None)`
   recursively validates before execution. Query length <=10000, AST nesting <=32.
 - `get_schema` / `get_structured_schema` are cached text/dictionary properties;
@@ -121,6 +134,18 @@ Async BaseTool invocation is a thread adapter, not native async or a thread-safe
 promise. JSON bulk relationship writes have an upstream limitation (TD-02);
 ingestion deliberately uses incremental object writes. See `TECH_DEBT.md`.
 
+Trusted apps can also bulk-load columnar tables with
+`GestaltDBGraph.ingest_polars(node_df, edge_df, ...)` and
+`GestaltDBGraph.ingest_arrow(node_ids, edge_ids, sources, targets, edge_types, ...)`.
+These helpers validate frames/columns, accept `node_property_columns` /
+`edge_property_columns`, `chunk_size`, and `index_mode` (`MAINTAIN`, `DEFER`,
+`DEFER_REBUILD` via `gestaltdb.IndexMaintenanceMode` when available), invalidate
+the schema cache, and return `nodes`/`edges`/`rebuilt_indexes`/`stale_indexes`
+counts. They are not agent tools, promise no whole-import atomicity, and leave
+`DEFER`ed indexes stale until the trusted app rebuilds them. CSV-built frames
+need explicit numeric dtypes and one label list per row (bare label strings are
+rejected). `polars`/`pyarrow` stay optional dependencies imported inside the call.
+
 ## Bounded graph retrieval
 
 `GestaltDBRetriever(graph, hops=(), seed_ids=(), seed_label=None,
@@ -157,6 +182,33 @@ flagged truncation. Setting `max_sources_per_entity=0` disables source lookup.
 Caps bound returned entities/content, not execution, intermediate memory or total
 metadata size. Indexed seed candidates are consumed incrementally, with one extra
 valid seed to detect truncation.
+
+## Multi-hop sampling tool
+
+`GestaltDBSamplingTool(graph, max_paths=50, max_nodes=1000, max_edges=2000,
+max_chars=16000, rng_seed=0)` (`gestaltdb_sample_paths`) wraps
+`sample_typed_paths`/`sample_typed_subgraph` over an ordered `SamplingPattern`.
+
+- Agent input: `seed_ids` (explicit node IDs), `hops` (ordered
+  `SamplingHopInput(edge_type, direction=out, sample_size=10)`, `direction`
+  `out`/`in`/`any`), and `mode` (`paths` or `subgraph`). Caps and `rng_seed`
+  are application-controlled.
+- `paths` mode returns decoded `paths` (`seed` plus `edge_id`/`source_id`/
+  `target_id`/`neighbor_id`/`edge_type`/`direction` steps) with
+  `returned_paths` and `truncated`. `subgraph` mode additionally returns
+  `nodes` (`id`/labels/properties) and `edges` (`id`/source/target/type/
+  properties) with their own counts; all lists share one `truncated` flag via
+  the bounded-JSON envelope.
+- Use the retriever for seeded entity documents with source text; use this tool
+  for raw multi-hop paths or a materialized subgraph without per-entity
+  documents or source linking.
+
+Caps: `len(hops) <= 8`, `1 <= sample_size <= 100`, plus `max_paths`,
+`max_nodes`, `max_edges`, `max_chars`. Absent seeds are skipped and never
+fabricated; output ordering is deterministic (sorted) and is **not** a
+relevance ranking. The tool only reads, never writes, and never rebuilds
+indexes; typed adjacency stays usable during deferred edge ingest. Caps bound
+returned output, not execution or intermediate materialization.
 
 ## Claim (epistemic) tools
 
@@ -222,6 +274,36 @@ responses have the same keys whether found or missing (null identities and empty
 lists for missing claims). Search treats omitted or null `object` as any object;
 null-literal lookup is available through status instead. A search without indexed
 filters scans the full catalog, regardless of the output cap.
+
+## Visualization artifacts (opt-in)
+
+`render_artifact(graph, mode, output_path, ...)` is the trusted-application
+entry point for offline visualization. `mode` is `"nodes_edges"` (explicit
+collections, no database needed), `"query"` (Cypher matches, enforced read-only
+by the same fail-closed policy as the query tool) or `"sample"` (typed
+subgraph sampling around seeds via `SamplingPattern`, the large-graph path).
+`format` is `"html"` (self-contained offline viewer: the D3.js/React bundle
+is prebuilt and packaged, no network, CDN, remote fonts, server or notebook
+channel) or `"svg"` (dependency-free static `circle`/`grid` layout). The
+artifact is written to the explicit `output_path` (suffix must match the
+format); the returned value is bounded summary JSON with `path`, `format`,
+`mode`, `node_count`/`edge_count`, `truncated`, `nodes_dropped`/`edges_dropped`,
+`banner` and `warning`. Raw HTML/SVG is never returned to the agent.
+
+Caps default to `VizOptions` (2000 nodes / 5000 edges) with absolute ceilings
+at twice the caps. Cap truncation is deterministic, emits `TruncationWarning`
+(captured into the summary) and renders an on-canvas capped-sample banner in
+the viewer (mirrored as summary `banner` text and embedded in static SVG).
+Payloads beyond the absolute ceiling raise an error naming the sampling
+alternative instead of freezing the browser. Visualization imports stay lazy:
+without the packaged `gestaltdb.viz` module, calls fail with
+`VizDependencyError` and an actionable upgrade message.
+
+`GestaltDBVizTool(graph=graph, output_dir=...)` exposes `nodes_edges`/`query`
+modes to agents. The artifact directory is application-controlled; the agent
+supplies only a basename (traversal rejected), and output is bounded by
+`max_chars`. Sample mode needs caller-side seeds/pattern, so it stays in
+`render_artifact`.
 
 ## Dialect guidance, workflow, and limits
 
