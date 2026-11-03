@@ -41,8 +41,18 @@ without installing Community or Neo4j. This is not inheritance/chain compatibili
   Opening existing stores is unaffected by the creation default; no migration
   from LMDB or LevelDB is performed.
 - `graph` accesses the raw database only while the wrapper is open.
+- `manifest` / `database_id` are read-only inspection properties; `index_statistics()`
+  reports persisted property-index definitions and `stale_indexes()` reports sorted
+  families needing `graph.rebuild_deferred_indexes()`. All four pass through to the
+  underlying handle and fail closed once the adapter is closed. No raw write
+  transaction is exposed; pin several reads with `adapter.graph.read_view(...)`
+  (temporal horizon) or `adapter.graph.current_read_view()` (backend snapshot).
 - `query(query, params=None, read_snapshot=None)` permits upstream reads/writes;
-  backend/parser errors propagate unchanged.
+  backend/parser errors propagate unchanged. `read_snapshot=None` snapshots
+  automatically where supported, `True` requires one, `False` opts out. LMDB
+  snapshots verifiably (MVCC); transactional PyRex (`backend_options=
+  {"transactional": True}`) pins reads without verifiable provenance; LevelDB and
+  default PyRex reject explicit snapshots with `NotImplementedError`.
 - `query_read_only(query, params=None, allowed_procedures=(), read_snapshot=None)`
   recursively validates before execution. Query length <=10000, AST nesting <=32.
 - `get_schema` / `get_structured_schema` are cached text/dictionary properties;
