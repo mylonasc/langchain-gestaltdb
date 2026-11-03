@@ -58,6 +58,12 @@ class GestaltDBRetriever(BaseRetriever):
     relevance ranking. Sampling itself is seeded for reproducibility but carries
     no database ordering guarantee. The retriever never writes; seeding by label
     requires the caller to have created the matching property index already.
+
+    When to use this retriever vs ``GestaltDBSamplingTool``: use this retriever
+    for seeded entity documents with source-linked text (one ``Document`` per
+    entity, ``MENTIONS`` provenance). Use the sampling tool for raw multi-hop
+    typed paths or a materialized subgraph (ordered ``SamplingPattern``
+    traversal without per-entity documents or source linking).
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
