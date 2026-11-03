@@ -15,13 +15,18 @@ from langchain_gestaltdb.graph import GestaltDBGraph
 from langchain_gestaltdb.graph_document import GraphDocument, GraphNode, GraphRelationship
 from langchain_gestaltdb.index_advisor import GestaltDBIndexAdvisorTool, advise_index
 from langchain_gestaltdb.retrievers import GestaltDBRetriever, RetrievalHop
+from langchain_gestaltdb.sampling import GestaltDBSamplingTool, SamplingHopInput, SamplingInput
 from langchain_gestaltdb.toolkits import GestaltDBClaimToolkit, GestaltDBToolkit
 from langchain_gestaltdb.tools import GestaltDBQueryTool, GestaltDBSchemaTool
+from langchain_gestaltdb.viz import GestaltDBVizTool, VizDependencyError, render_artifact
 
 __all__ = [
     "GestaltDBGraph",
     "GestaltDBRetriever",
     "RetrievalHop",
+    "GestaltDBSamplingTool",
+    "SamplingHopInput",
+    "SamplingInput",
     "GraphDocument",
     "GraphNode",
     "GraphRelationship",
@@ -38,4 +43,7 @@ __all__ = [
     "GestaltDBQueryTool",
     "GestaltDBSchemaTool",
     "advise_index",
+    "GestaltDBVizTool",
+    "VizDependencyError",
+    "render_artifact",
 ]
