@@ -100,3 +100,48 @@ def test_ast_nesting_and_unknown_clauses_fail_closed() -> None:
     with patch("langchain_gestaltdb._read_only.parse_ast", return_value=Query((object(),), "")):
         with pytest.raises(ReadOnlyQueryError, match="Clause"):
             validate_read_only("SHOW INDEXES")
+
+
+def test_show_index_singular_is_read_only(tmp_path: Path) -> None:
+    with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as adapter:
+        assert isinstance(adapter.query_read_only("SHOW INDEX"), list)
+
+
+def test_show_constraints_allowed_but_create_rejected_read_only(tmp_path: Path) -> None:
+    with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as adapter:
+        assert isinstance(adapter.query_read_only("SHOW CONSTRAINTS"), list)
+        with pytest.raises(ReadOnlyQueryError):
+            adapter.query_read_only(
+                "CREATE CONSTRAINT unique_name FOR (n:Person) REQUIRE n.name IS UNIQUE"
+            )
+
+
+def test_sample_typed_paths_allowlist(tmp_path: Path) -> None:
+    query = "CALL pg.sample_typed_paths($seeds,$pattern) YIELD path RETURN path"
+    with pytest.raises(ReadOnlyQueryError, match="allowlisted"):
+        validate_read_only(query)
+    validate_read_only(query, ["pg.sample_typed_paths"])
+    with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as adapter:
+        with pytest.raises(ReadOnlyQueryError, match="allowlisted"):
+            adapter.query_read_only(query)
+
+
+def test_entails_requires_allowlist_and_world_valid_time(tmp_path: Path) -> None:
+    base = (
+        "CALL kg.entails($agent,$prop,$mode,{world:$world,validTime:$validTime}) "
+        "YIELD status, confidence, explanation RETURN status"
+    )
+    missing = (
+        "CALL kg.entails($agent,$prop,$mode,{world:$world}) "
+        "YIELD status, confidence, explanation RETURN status"
+    )
+    with pytest.raises(ReadOnlyQueryError, match="allowlisted"):
+        validate_read_only(base)
+    with pytest.raises(ReadOnlyQueryError, match="world and validTime"):
+        validate_read_only(missing, ["kg.entails"])
+    validate_read_only(base, ["kg.entails"])
+    with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as adapter:
+        with pytest.raises(ReadOnlyQueryError):
+            adapter.query_read_only(base)
+        with pytest.raises(ReadOnlyQueryError, match="world and validTime"):
+            adapter.query_read_only(missing, allowed_procedures=["kg.entails"])
