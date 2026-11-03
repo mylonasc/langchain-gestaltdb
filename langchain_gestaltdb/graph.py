@@ -6,7 +6,7 @@ import json
 from collections.abc import Collection, Iterable
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from gestaltdb.graphdb import GraphDB
 
@@ -23,6 +23,15 @@ class GestaltDBGraph:
     the adapter but leaves the caller's database open. This low-level adapter
     permits writes; use read-only tools for untrusted agent queries. Upstream
     errors propagate unchanged. Backend guarantees are not strengthened.
+
+    Read-only inspection (``manifest``, ``database_id``, ``index_statistics``,
+    ``stale_indexes``) passes through to the underlying handle and fails closed
+    once this adapter is closed. No raw write transaction is exposed to agents:
+    writes go through validated ingestion, claim tools, or explicit trusted use
+    of ``graph``. To pin several reads to one visible state, use
+    ``adapter.graph.read_view(...)`` (temporal horizon) or
+    ``adapter.graph.current_read_view()`` (backend snapshot); both are backend
+    dependent (see :meth:`query`).
     """
 
     def __init__(
@@ -72,6 +81,53 @@ class GestaltDBGraph:
             raise RuntimeError("GestaltDBGraph is closed")
         return self._graph
 
+    @property
+    def manifest(self) -> dict[str, Any]:
+        """Return a copy of the persisted backend/serializer manifest.
+
+        Read-only passthrough to ``GraphDB.manifest``; fails closed once this
+        adapter is closed. ``manifest["backend"]["name"]`` is the persisted
+        backend (``"pyrex"``, ``"lmdb"``, or ``"leveldb"``); ``open`` always
+        follows it, never the creation default. The copy is detached, so
+        mutating it cannot affect the database.
+        """
+        return cast("dict[str, Any]", self.graph.manifest)
+
+    @property
+    def database_id(self) -> str:
+        """Return the stable UUID persisted with this database.
+
+        Read-only passthrough to ``GraphDB.database_id``; fails closed once
+        this adapter is closed. The value is stable across close/reopen of the
+        same database directory and identifies the source in read-view
+        provenance. It is not a snapshot, ordering, or secrecy guarantee.
+        """
+        return cast("str", self.graph.database_id)
+
+    def index_statistics(self) -> dict[str, object]:
+        """Return persisted property-index definitions visible to the planner.
+
+        Read-only passthrough to ``GraphDB.index_statistics``; fails closed
+        once this adapter is closed. Keys are ``"indexed_node_properties"`` and
+        ``"indexed_edge_properties"`` with sorted tuple values. Reports
+        definitions, not freshness; consult :meth:`stale_indexes` for deferred
+        families still requiring a rebuild.
+        """
+        return cast("dict[str, object]", self.graph.index_statistics())
+
+    def stale_indexes(self) -> tuple[str, ...]:
+        """Return sorted index families requiring a rebuild.
+
+        Read-only passthrough to ``GraphDB.stale_indexes``; fails closed once
+        this adapter is closed. A fresh database reports ``()``; deferred
+        ingestion (``index_mode="defer"``) marks families such as
+        ``"node_label"``/``"edge_type"`` stale until
+        ``graph.rebuild_deferred_indexes()`` runs. Canonical entity reads bypass
+        stale secondary indexes, but indexed lookups must not be trusted while
+        their family is listed here.
+        """
+        return cast("tuple[str, ...]", self.graph.stale_indexes())
+
     def query(
         self,
         query: str,
@@ -85,6 +141,34 @@ class GestaltDBGraph:
         and temporal values retain exact fields with a ``$type`` tag. Invalid
         UTF-8, unknown objects, cycles and non-finite floats fail explicitly.
         No timeout, thread safety, or backend-independent atomicity is added.
+
+        ``read_snapshot`` selects backend snapshot behavior and otherwise
+        propagates to ``GraphDB.query`` unchanged: ``None`` (default) uses a
+        unified read snapshot automatically where the backend supports one;
+        ``True`` requires one and fails where it is unavailable; ``False`` opts
+        out. LMDB always supports snapshots and exposes verifiable MVCC
+        provenance via ``graph.current_read_view()``. Transactional PyRex
+        (``backend_options={"transactional": True}``) can pin reads but its
+        provenance is not verifiable. LevelDB and default (non-transactional)
+        PyRex reject explicit snapshot requests with ``NotImplementedError``;
+        reads there are best-effort, not pinned across the query.
+
+        To pin several reads to one visible state, do not rely on repeated
+        ``read_snapshot`` queries. Instead share one horizon explicitly::
+
+            with adapter.graph.read_view(valid_time=...) as view:
+                ...
+            with adapter.graph.current_read_view() as view:
+                ...
+
+        ``read_view`` pins a temporal commit horizon; ``current_read_view``
+        pins mutable entities, adjacency, and indexes to one backend snapshot
+        where supported. Both are context managers on the underlying handle
+        (access via ``adapter.graph``, which fails closed), must be closed via
+        the ``with`` block, and inherit the backend limits above. Lookup and
+        traversal order is never guaranteed; compare ID sets, and decode typed
+        traversal byte IDs with ``graph.key_to_string(...)`` before comparing
+        with string IDs. There is no whole-graph enumeration API.
         """
         result = self.graph.query(query, parameters=params, read_snapshot=read_snapshot)
         return [normalize(record) for record in result.records]
@@ -109,6 +193,11 @@ class GestaltDBGraph:
         Read-only means write prevention, not a computational budget. Only
         pg.sample_typed_paths/kg.entails can be explicitly allowlisted; both
         may be expensive. Query text is limited to 10000 characters.
+
+        ``read_snapshot`` has the same backend-dependent semantics as
+        :meth:`query`: ``None`` snapshots automatically where supported,
+        ``True`` requires a snapshot (LMDB or transactional PyRex; LevelDB and
+        default PyRex raise ``NotImplementedError``), ``False`` opts out.
         """
         _ = self.graph
         validate_read_only(query, allowed_procedures)
