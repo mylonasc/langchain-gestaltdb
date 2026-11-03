@@ -16,10 +16,18 @@ from langchain_gestaltdb.graph_document import GraphDocument, GraphNode, GraphRe
 from langchain_gestaltdb.index_advisor import GestaltDBIndexAdvisorTool, advise_index
 from langchain_gestaltdb.modal import GestaltDBEntailsTool, GestaltDBWorldAccessibilityTool
 from langchain_gestaltdb.retrievers import GestaltDBRetriever, RetrievalHop
+from langchain_gestaltdb.rules import (
+    GestaltDBRuleCreateTool,
+    GestaltDBRuleGetTool,
+    GestaltDBRuleListTool,
+    GestaltDBRuleMaintainTool,
+    GestaltDBRuleRunTool,
+)
 from langchain_gestaltdb.sampling import GestaltDBSamplingTool, SamplingHopInput, SamplingInput
 from langchain_gestaltdb.toolkits import (
     GestaltDBClaimToolkit,
     GestaltDBModalToolkit,
+    GestaltDBRuleToolkit,
     GestaltDBToolkit,
 )
 from langchain_gestaltdb.tools import GestaltDBQueryTool, GestaltDBSchemaTool
@@ -45,6 +53,12 @@ __all__ = [
     "GestaltDBClaimToolkit",
     "GestaltDBEntailsTool",
     "GestaltDBModalToolkit",
+    "GestaltDBRuleCreateTool",
+    "GestaltDBRuleGetTool",
+    "GestaltDBRuleListTool",
+    "GestaltDBRuleMaintainTool",
+    "GestaltDBRuleRunTool",
+    "GestaltDBRuleToolkit",
     "GestaltDBToolkit",
     "GestaltDBIndexAdvisorTool",
     "GestaltDBQueryTool",
