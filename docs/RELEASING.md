@@ -97,6 +97,15 @@ minutes for cached PyPI JSON 404s; persistent absence/hash mismatches still fail
 This was exercised on 0.1.0: the initial Python 3.12 metadata check saw cached 404s,
 and verification succeeded on attempt 2 without repeating the upload.
 
+## Integration branch (G17 agent backend)
+
+Feature branches (`feat/G17-0X-*`) target `integration/gestalt-agent-backend`;
+reviewed slices merge integration → `main` with `Refs`/`Closes` links, a
+strict/up-to-date `CI gate`, and resolved conversations. `publish.yml` still
+runs on `main` only and still requires explicit per-release authorization, so
+the same artifact/hash verification applies to slices once they land on `main`.
+Merging anywhere never authorizes publication.
+
 ## First-release evidence
 
 Version [0.1.0 on PyPI](https://pypi.org/project/langchain-gestaltdb/0.1.0/) and

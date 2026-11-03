@@ -5,7 +5,8 @@ application and are never part of the default read-only claim toolkit. Agent
 authority, provenance and confidence are never inferred; the caller must supply
 them explicitly. Every write appends an immutable, bitemporal version, so fact
 validity (``valid``) stays distinct from system knowledge time (``system_time``)
-and prior evidence remains retrievable. There is no delete path.
+and prior evidence remains retrievable. There is no delete path. Truncation
+receipts and retry rules are documented in docs/LIMITS.md.
 """
 
 from __future__ import annotations

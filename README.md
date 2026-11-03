@@ -35,6 +35,7 @@ values use a `$type` tag plus exact fields; unsupported objects fail explicitly.
 Low-level queries permit writes and propagate upstream errors unchanged: do not
 give this API directly to an untrusted agent. Backend transaction/snapshot
 guarantees are unchanged; there is no native async or execution timeout.
+Deployment limits are consolidated in [the limits page](docs/LIMITS.md).
 
 For parsed-AST write prevention, call `graph.query_read_only(query, params)`.
 It rejects mutations, schema changes, unknown syntax, and procedures by default,
@@ -121,6 +122,7 @@ Tool-facing backend errors are redacted; low-level graph errors still propagate.
 Treat graph/source text as untrusted data, not instructions. Read-only prevents
 writes but does not bound execution cost, intermediate memory, or result collection.
 LangChain's async tool adapter offloads synchronous work; no native async is claimed.
+See [the limits page](docs/LIMITS.md) and [the agent workflow](docs/AGENT_WORKFLOW.md).
 
 ### Bounded graph retrieval
 
@@ -221,12 +223,14 @@ metadata. Only filters and times are agent inputs: the graph, caps
 JSON, not execution time or memory.
 
 Status and evidence use one claim resolution; the status is computed before
-evidence truncation. Read-tool `max_chars` includes the complete response envelope.
+evidence truncation. Read-tool `max_chars` includes the complete response envelope. Output caps bound returned
+JSON, not execution time or memory; see [the limits page](docs/LIMITS.md).
 If metadata alone cannot fit, the read tool returns a bounded JSON `error` with
 `truncated: true` instead of silently clipping identities or times.
 Search treats omitted or null `object` as any object; null-literal filtering is
 not exposed by search (use status for a specific null-literal statement).
-Omitting every indexed filter scans the full claim catalog.
+Omitting every indexed filter scans the full claim catalog; see
+[the agent workflow](docs/AGENT_WORKFLOW.md) for scan-cost guidance.
 
 ### Opt-in claim writes
 
@@ -277,6 +281,12 @@ Run the offline claim status/contradiction/provenance example:
 
 ```bash
 uv run --locked python examples/claim_agent.py
+```
+
+Run the offline schema → query/retrieve → claim/explain workflow demo:
+
+```bash
+uv run --locked python examples/agent_workflow.py
 ```
 
 Run the offline opt-in claim-write example (fact validity vs system knowledge time):
