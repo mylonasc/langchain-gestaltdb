@@ -19,6 +19,7 @@ from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool, ToolException
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
+from langchain_gestaltdb._compat import call_upstream
 from langchain_gestaltdb._serialization import normalize
 from langchain_gestaltdb.claims import _serialize_claim_version
 from langchain_gestaltdb.graph import GestaltDBGraph
@@ -187,7 +188,9 @@ class GestaltDBClaimAssertTool(_ClaimWriteTool):
         run_manager: CallbackManagerForToolRun | None = None,
     ) -> str:
         try:
-            version = self.graph.graph.assert_claim(
+            version = call_upstream(
+                self.graph.graph,
+                "assert_claim",
                 subject=subject,
                 predicate=predicate,
                 object=object,
@@ -239,7 +242,7 @@ class GestaltDBClaimCorrectTool(_ClaimWriteTool):
                 kwargs["valid_to"] = valid_to
             # Use the logical ID: the Claim-object overload ignores explicit
             # confidence/provenance on GestaltDB 0.12.0 (upstream issue #110).
-            version = self.graph.graph.correct_claim(claim_id, **kwargs)
+            version = call_upstream(self.graph.graph, "correct_claim", claim_id, **kwargs)
         except Exception:
             raise ToolException(_CLAIM_WRITE_ERROR) from None
         return self._result(version)
@@ -275,7 +278,7 @@ class GestaltDBClaimRetractTool(_ClaimWriteTool):
                 kwargs["valid_from"] = valid_from
             if valid_to is not None:
                 kwargs["valid_to"] = valid_to
-            version = self.graph.graph.retract_claim(claim_id, **kwargs)
+            version = call_upstream(self.graph.graph, "retract_claim", claim_id, **kwargs)
         except Exception:
             raise ToolException(_CLAIM_WRITE_ERROR) from None
         return self._result(version)
