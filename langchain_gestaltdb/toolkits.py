@@ -24,6 +24,11 @@ from langchain_gestaltdb.rules import (
     GestaltDBRuleMaintainTool,
     GestaltDBRuleRunTool,
 )
+from langchain_gestaltdb.temporal_tools import (
+    GestaltDBEdgeAsOfTool,
+    GestaltDBNodeAsOfTool,
+    GestaltDBTemporalScanTool,
+)
 from langchain_gestaltdb.tools import GestaltDBQueryTool, GestaltDBSchemaTool
 
 
@@ -101,6 +106,31 @@ class GestaltDBClaimToolkit(BaseToolkit):
                 ]
             )
         return tools
+
+
+class GestaltDBTemporalToolkit(BaseToolkit):
+    """Bitemporal history toolkit; read-only with application-controlled bounds.
+
+    Temporal versions are immutable assertions separate from mutable
+    current-state records. Migration, orphan listing/reclamation and index
+    rebuilds are trusted-application runbook operations, never agent tools.
+    Construction bounds cannot be changed by an agent.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    graph: GestaltDBGraph = Field(exclude=True)
+    max_entities: int = Field(default=50, ge=1, le=1000, exclude=True)
+    max_chars: int = Field(default=16_000, ge=256, le=1_000_000, exclude=True)
+
+    def get_tools(self) -> list[BaseTool]:
+        """Construct tools without transferring ownership of the graph handle."""
+        return [
+            GestaltDBNodeAsOfTool(graph=self.graph, max_chars=self.max_chars),
+            GestaltDBEdgeAsOfTool(graph=self.graph, max_chars=self.max_chars),
+            GestaltDBTemporalScanTool(
+                graph=self.graph, max_entities=self.max_entities, max_chars=self.max_chars
+            ),
+        ]
 
 
 class GestaltDBRuleToolkit(BaseToolkit):
