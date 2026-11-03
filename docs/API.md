@@ -22,6 +22,9 @@ Import from `langchain_gestaltdb`:
 | `GestaltDBClaimAssertTool` | Opt-in append-only sourced assertion/denial |
 | `GestaltDBClaimCorrectTool` | Opt-in append-only claim correction |
 | `GestaltDBClaimRetractTool` | Opt-in append-only claim retraction |
+| `GestaltDBVizTool` | Opt-in offline visualization artifact tool (bounded summary) |
+| `render_artifact` | Trusted-app offline HTML/SVG artifact helper (bounded summary) |
+| `VizDependencyError` | Packaged `gestaltdb.viz` module is unavailable |
 | `ReadOnlyQueryError` | Query could not be proven read-only |
 
 `GraphDocument.from_external(model_or_mapping)` validates equivalent fields
@@ -201,6 +204,36 @@ responses have the same keys whether found or missing (null identities and empty
 lists for missing claims). Search treats omitted or null `object` as any object;
 null-literal lookup is available through status instead. A search without indexed
 filters scans the full catalog, regardless of the output cap.
+
+## Visualization artifacts (opt-in)
+
+`render_artifact(graph, mode, output_path, ...)` is the trusted-application
+entry point for offline visualization. `mode` is `"nodes_edges"` (explicit
+collections, no database needed), `"query"` (Cypher matches, enforced read-only
+by the same fail-closed policy as the query tool) or `"sample"` (typed
+subgraph sampling around seeds via `SamplingPattern`, the large-graph path).
+`format` is `"html"` (self-contained offline viewer: the D3.js/React bundle
+is prebuilt and packaged, no network, CDN, remote fonts, server or notebook
+channel) or `"svg"` (dependency-free static `circle`/`grid` layout). The
+artifact is written to the explicit `output_path` (suffix must match the
+format); the returned value is bounded summary JSON with `path`, `format`,
+`mode`, `node_count`/`edge_count`, `truncated`, `nodes_dropped`/`edges_dropped`,
+`banner` and `warning`. Raw HTML/SVG is never returned to the agent.
+
+Caps default to `VizOptions` (2000 nodes / 5000 edges) with absolute ceilings
+at twice the caps. Cap truncation is deterministic, emits `TruncationWarning`
+(captured into the summary) and renders an on-canvas capped-sample banner in
+the viewer (mirrored as summary `banner` text and embedded in static SVG).
+Payloads beyond the absolute ceiling raise an error naming the sampling
+alternative instead of freezing the browser. Visualization imports stay lazy:
+without the packaged `gestaltdb.viz` module, calls fail with
+`VizDependencyError` and an actionable upgrade message.
+
+`GestaltDBVizTool(graph=graph, output_dir=...)` exposes `nodes_edges`/`query`
+modes to agents. The artifact directory is application-controlled; the agent
+supplies only a basename (traversal rejected), and output is bounded by
+`max_chars`. Sample mode needs caller-side seeds/pattern, so it stays in
+`render_artifact`.
 
 ## Tested platform and non-goals
 
