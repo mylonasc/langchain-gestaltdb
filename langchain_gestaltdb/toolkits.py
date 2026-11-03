@@ -16,6 +16,7 @@ from langchain_gestaltdb.claims import (
     GestaltDBClaimStatusTool,
 )
 from langchain_gestaltdb.graph import GestaltDBGraph
+from langchain_gestaltdb.index_advisor import GestaltDBIndexAdvisorTool
 from langchain_gestaltdb.tools import GestaltDBQueryTool, GestaltDBSchemaTool
 
 
@@ -28,10 +29,11 @@ class GestaltDBToolkit(BaseToolkit):
     allowed_procedures: tuple[str, ...] = Field(default=(), exclude=True)
     max_rows: int = Field(default=100, ge=1, le=1000, exclude=True)
     max_chars: int = Field(default=16_000, ge=256, le=1_000_000, exclude=True)
+    include_index_advisor: StrictBool = Field(default=False, exclude=True)
 
     def get_tools(self) -> list[BaseTool]:
         """Construct tools without transferring ownership of the graph handle."""
-        return [
+        tools: list[BaseTool] = [
             GestaltDBSchemaTool(graph=self.graph, max_chars=self.max_chars),
             GestaltDBQueryTool(
                 graph=self.graph,
@@ -41,6 +43,9 @@ class GestaltDBToolkit(BaseToolkit):
                 max_chars=self.max_chars,
             ),
         ]
+        if self.include_index_advisor:
+            tools.append(GestaltDBIndexAdvisorTool(graph=self.graph, max_chars=self.max_chars))
+        return tools
 
 
 class GestaltDBClaimToolkit(BaseToolkit):

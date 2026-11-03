@@ -11,6 +11,12 @@ from gestaltdb.graphdb import GraphDB
 DIALECT_GUIDANCE = (
     "Use parameterized GestaltDB Cypher (not all Neo4j syntax is supported). "
     "Node types are native labels; relationship types are stored in properties['type']. "
+    "Use SHOW INDEXES and SHOW CONSTRAINTS to inspect configured property indexes and "
+    "persisted single-property node UNIQUE/IS NOT NULL constraints. "
+    "Property indexes are explicit: the trusted application creates them with "
+    "create_node_property_index/create_edge_property_index and rebuilds deferred "
+    "ingests with rebuild_deferred_indexes(); use the gestaltdb_index_advisor tool to "
+    "check existence and staleness before relying on an index. "
     "Use MATCH/OPTIONAL MATCH, WHERE, WITH, UNWIND, RETURN, UNION and supported functions. "
     "Pattern comprehensions, exists(pattern), APOC and arbitrary procedures are unsupported. "
     "Schema is sampled unless explicitly configured otherwise; "
@@ -96,6 +102,21 @@ def discover_schema(
             for label, props in sorted(values.items())
         }
 
+    stale: tuple[str, ...]
+    try:
+        stale = tuple(graph.stale_indexes())
+    except Exception:
+        stale = ()
+    try:
+        index_definitions = dict(graph.index_statistics())
+    except Exception:
+        index_definitions = {}
+    constraints: list[dict[str, Any]]
+    try:
+        constraints = [dict(record) for record in graph.query("SHOW CONSTRAINTS").records]
+    except Exception:
+        constraints = []
+
     return {
         "node_props": properties(node_props),
         "rel_props": properties(rel_props),
@@ -108,7 +129,11 @@ def discover_schema(
             "inspected_nodes": sum(node is not None for node in nodes.values()),
             "inspected_edges": sum(edge is not None for edge in edges),
             "truncated": nodes_truncated or edges_truncated,
-            "indexes": graph.index_statistics(),
+            "indexes": index_definitions,
+            "index_definitions": index_definitions,
+            "stale_indexes": sorted(stale),
+            "temporal_indexes_current": "temporal" not in stale,
+            "constraints": constraints,
             "dialect": DIALECT_GUIDANCE,
         },
     }
