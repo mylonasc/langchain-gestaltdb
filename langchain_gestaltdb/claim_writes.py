@@ -24,7 +24,8 @@ commit-ordinal prefix horizon); commit IDs are never reused. Prefer
 ``through_commit`` when replaying the exact receipt of a just-written version,
 and ``system_time`` when aligning knowledge time with external timestamps.
 Fact validity (``valid_from``/``valid_to``) stays distinct from either horizon:
-retractions narrow validity without deleting history.
+retractions narrow validity without deleting history. Truncation
+receipts and retry rules are documented in docs/LIMITS.md.
 """
 
 from __future__ import annotations

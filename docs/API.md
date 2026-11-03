@@ -33,6 +33,27 @@ Import from `langchain_gestaltdb`:
 `GraphDocument.from_external(model_or_mapping)` validates equivalent fields
 without installing Community or Neo4j. This is not inheritance/chain compatibility.
 
+## Agent-backend tool map (G17 integration surface)
+
+Status key: **tree** ships in this checkout; **slice** lands through its
+`feat/G17-0X-*` PR to the same integration branch; **runbook** has no agent
+tool by design and stays with the trusted application. The full agent
+sequence is described in `docs/AGENT_WORKFLOW.md`; deployment limits live in
+`docs/LIMITS.md`.
+
+| Tool / helper | Module | Status | Notes |
+| --- | --- | --- | --- |
+| `call_upstream` / `service_layout` compat bridge | `langchain_gestaltdb._compat` | tree (G17-01) | facade-preferred, service-fallback; `explain_claim->rules.explain`, `run_rules->run`, `maintain_truth->maintain`, `read_view->temporal.open_read_view` |
+| Lifecycle inspection (`manifest`, `database_id`, `index_statistics`, `stale_indexes`) + `read_snapshot` semantics | `GestaltDBGraph` | slice (G17-02) | read-only passthroughs, fail closed when closed; LMDB snapshots verifiable, transactional PyRex pins, LevelDB/default PyRex reject explicit snapshots |
+| Read-only policy: `SHOW INDEX[ES]`/`SHOW CONSTRAINTS`, `kg.entails` world+validTime options | `_read_only` | slice (G17-03/04) | `CREATE/DROP CONSTRAINT` stays write-gated; temporal qualifiers make queries write-restricted |
+| `advise_index` / `GestaltDBIndexAdvisorTool` | `langchain_gestaltdb.index_advisor` | slice (G17-05) | read-only; opt-in via `GestaltDBToolkit(include_index_advisor=True)`; agents never run DDL |
+| `ingest_polars` / `ingest_arrow` | `GestaltDBGraph` | slice (G17-06) | trusted-app bulk helper, not an agent tool; `MAINTAIN`/`DEFER`/`DEFER_REBUILD`, chunked, no whole-import atomicity |
+| `GestaltDBSamplingTool` (`gestaltdb_sample_paths`) | `langchain_gestaltdb.sampling` | slice (G17-07) | ordered `SamplingPattern`, `paths`/`subgraph` modes, decoded IDs, deterministic order |
+| Temporal as-of wrappers | upstream `temporal` API | runbook (G17-08) | `get_*_as_of` / `iter_*_as_of` with pinned `read_view` horizons; migration/orphan recovery stays a trusted-app runbook |
+| Rule read/write tools | upstream `rules` API | runbook (G17-09/10) | `create_rule`/`run`/`maintain` via bridge mapping; `explain_claim` already covered |
+| Modal entailment tool | `CALL kg.entails` / upstream `entails` | runbook (G17-10) | procedure allowlist requires `world`+`validTime`; world-accessibility writes stay opt-in |
+| Visualization artifacts | upstream `gestaltdb.viz` | runbook (G17-13 scope) | trusted app writes HTML/SVG to an explicit path; agent receives a bounded summary plus path |
+
 ## Graph lifecycle and operations
 
 - `GestaltDBGraph(db, owns_graph=False, schema_node_limit=100,
@@ -318,6 +339,23 @@ modes to agents. The artifact directory is application-controlled; the agent
 supplies only a basename (traversal rejected), and output is bounded by
 `max_chars`. Sample mode needs caller-side seeds/pattern, so it stays in
 `render_artifact`.
+
+## Dialect guidance, workflow, and limits
+
+`DIALECT_GUIDANCE` (`langchain_gestaltdb/_schema.py`) is the supported-Cypher
+summary embedded in schema output. It is refreshed on every upstream minor
+alongside the read-only policy, and any drift from the installed
+`gestaltdb.agent_docs` guides (`list` / `get cypher --examples` /
+`search '<API name>'`) is a docs bug: re-run the agent-docs diff when the
+`gestaltdb` pin moves (see `docs/COMPAT_0_17.md`). Agent planning guidance
+lives in `docs/AGENT_WORKFLOW.md` (schema -> index check -> query/sample/
+retrieve -> temporal/claim check -> explain, with the Cypher vs retriever vs
+sampling vs claim vs entails decision tree, seeding rules, truncation
+envelopes, scan costs, stale-index recovery, per-backend `read_snapshot`, and
+CSV pitfalls). Deployment limits live in `docs/LIMITS.md` (output caps vs
+execution/memory/materialization, backend snapshot differences, no
+sandbox/multitenant claims, TD-04); tool documentation links there instead of
+repeating the full text.
 
 ## Tested platform and non-goals
 

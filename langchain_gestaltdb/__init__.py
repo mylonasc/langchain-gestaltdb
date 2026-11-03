@@ -13,6 +13,7 @@ from langchain_gestaltdb.claims import (
 )
 from langchain_gestaltdb.graph import GestaltDBGraph
 from langchain_gestaltdb.graph_document import GraphDocument, GraphNode, GraphRelationship
+from langchain_gestaltdb.index_advisor import GestaltDBIndexAdvisorTool, advise_index
 from langchain_gestaltdb.modal import GestaltDBEntailsTool, GestaltDBWorldAccessibilityTool
 from langchain_gestaltdb.retrievers import GestaltDBRetriever, RetrievalHop
 from langchain_gestaltdb.sampling import GestaltDBSamplingTool, SamplingHopInput, SamplingInput
@@ -45,9 +46,11 @@ __all__ = [
     "GestaltDBEntailsTool",
     "GestaltDBModalToolkit",
     "GestaltDBToolkit",
+    "GestaltDBIndexAdvisorTool",
     "GestaltDBQueryTool",
     "GestaltDBSchemaTool",
     "GestaltDBWorldAccessibilityTool",
+    "advise_index",
     "GestaltDBVizTool",
     "VizDependencyError",
     "render_artifact",

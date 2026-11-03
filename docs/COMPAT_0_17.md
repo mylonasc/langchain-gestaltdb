@@ -28,6 +28,33 @@ Verified:
 - `pyproject` pin unchanged in G17-01; version bump is G17-12 after full matrix passes.
 - TD-01 (typing): 0.17 ships more typing; revisit override after bump. TD-02 (bulk JSON): 0.12.1 fixed #109; re-benchmark on 0.17 before enabling fast path (G17-06). TD-03 (AST coupling): `cypher_ast` names stable 0.12→0.17; still version-coupled, needs upstream classifier watch.
 
+## Upgrade policy (pinned minor, G17-16)
+
+- The `gestaltdb` minor stays pinned (`>=0.12.0,<0.13` in `pyproject.toml`)
+  until a dedicated, verified upgrade PR moves it. No silent fallback and no
+  unpinned drift, so services-layout behavior (0.17+) can never leak in
+  unnoticed.
+- Each upgrade PR must: run the full suite against the new minor (including
+  the LMDB/LevelDB/PyRex contract jobs and offline examples), revisit
+  TD-01 (typing), TD-02 (bulk fast path), and TD-03 (AST coupling), re-run
+  the `agent_docs` diff (`list`, `get cypher --examples`,
+  `search '<API name>'`) and refresh `DIALECT_GUIDANCE` plus
+  `docs/AGENT_WORKFLOW.md` for any drift, and review the regenerated
+  `uv.lock`. A version-only change must not upgrade unrelated dependencies;
+  `uv.lock` is committed and CI enforces locked installs.
+- The bridge (`_compat.call_upstream`) keeps facade-first resolution after a
+  bump so 0.12-era call sites keep working while new service paths are
+  verified; renames stay mapped in one place.
+
+## publish.yml reuse (no behavior change)
+
+Releases keep using the existing `.github/workflows/publish.yml` on `main`
+only: manual dispatch of an exact stable `X.Y.Z`, Trusted Publishing/OIDC
+with the required `pypi` environment approval, and post-publication wheel
+verification (see `docs/RELEASING.md`). Merging to the integration branch or
+to `main` never authorizes publication; every release needs its own explicit
+maintainer authorization. The integration branch itself never publishes.
+
 ## How to probe locally
 
 ```bash
