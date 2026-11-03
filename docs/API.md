@@ -100,6 +100,18 @@ Async BaseTool invocation is a thread adapter, not native async or a thread-safe
 promise. JSON bulk relationship writes have an upstream limitation (TD-02);
 ingestion deliberately uses incremental object writes. See `TECH_DEBT.md`.
 
+Trusted apps can also bulk-load columnar tables with
+`GestaltDBGraph.ingest_polars(node_df, edge_df, ...)` and
+`GestaltDBGraph.ingest_arrow(node_ids, edge_ids, sources, targets, edge_types, ...)`.
+These helpers validate frames/columns, accept `node_property_columns` /
+`edge_property_columns`, `chunk_size`, and `index_mode` (`MAINTAIN`, `DEFER`,
+`DEFER_REBUILD` via `gestaltdb.IndexMaintenanceMode` when available), invalidate
+the schema cache, and return `nodes`/`edges`/`rebuilt_indexes`/`stale_indexes`
+counts. They are not agent tools, promise no whole-import atomicity, and leave
+`DEFER`ed indexes stale until the trusted app rebuilds them. CSV-built frames
+need explicit numeric dtypes and one label list per row (bare label strings are
+rejected). `polars`/`pyarrow` stay optional dependencies imported inside the call.
+
 ## Bounded graph retrieval
 
 `GestaltDBRetriever(graph, hops=(), seed_ids=(), seed_label=None,
