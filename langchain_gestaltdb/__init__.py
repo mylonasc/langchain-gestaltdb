@@ -24,10 +24,16 @@ from langchain_gestaltdb.rules import (
     GestaltDBRuleRunTool,
 )
 from langchain_gestaltdb.sampling import GestaltDBSamplingTool, SamplingHopInput, SamplingInput
+from langchain_gestaltdb.temporal_tools import (
+    GestaltDBEdgeAsOfTool,
+    GestaltDBNodeAsOfTool,
+    GestaltDBTemporalScanTool,
+)
 from langchain_gestaltdb.toolkits import (
     GestaltDBClaimToolkit,
     GestaltDBModalToolkit,
     GestaltDBRuleToolkit,
+    GestaltDBTemporalToolkit,
     GestaltDBToolkit,
 )
 from langchain_gestaltdb.tools import GestaltDBQueryTool, GestaltDBSchemaTool
@@ -53,6 +59,10 @@ __all__ = [
     "GestaltDBClaimToolkit",
     "GestaltDBEntailsTool",
     "GestaltDBModalToolkit",
+    "GestaltDBEdgeAsOfTool",
+    "GestaltDBNodeAsOfTool",
+    "GestaltDBTemporalScanTool",
+    "GestaltDBTemporalToolkit",
     "GestaltDBRuleCreateTool",
     "GestaltDBRuleGetTool",
     "GestaltDBRuleListTool",
