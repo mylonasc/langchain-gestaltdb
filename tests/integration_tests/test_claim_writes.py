@@ -5,12 +5,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from gestaltdb.graphdb import IndexMaintenanceMode
 from pydantic import ValidationError
 
 from langchain_gestaltdb import (
     GestaltDBClaimToolkit,
     GestaltDBGraph,
 )
+from langchain_gestaltdb._compat import call_upstream
 
 VALID_TIME = "2024-06-01T00:00:00Z"
 READ_ONLY_NAMES = [
@@ -480,3 +482,36 @@ def test_invalid_interval_does_not_reach_write_api(tmp_path: Path, operation: st
                         }
                     )
                 write.assert_not_called()
+
+
+def test_deferred_claim_write_stale_rebuild_read(tmp_path: Path) -> None:
+    with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
+        version = call_upstream(
+            graph.graph,
+            "assert_claim",
+            subject="alice",
+            predicate="WORKS_FOR",
+            object="acme",
+            polarity="positive",
+            agent="source:hr",
+            world="reported",
+            valid_from="2024-01-01T00:00:00Z",
+            index_mode=IndexMaintenanceMode.DEFER,
+        )
+        status = {tool.name: tool for tool in GestaltDBClaimToolkit(graph=graph).get_tools()}[
+            "gestaltdb_claim_status"
+        ]
+        args = {
+            "subject": "alice",
+            "predicate": "WORKS_FOR",
+            "object": "acme",
+            "valid_time": VALID_TIME,
+        }
+        # Indexed reads fail closed on stale temporal indexes; the toolkit
+        # never rebuilds implicitly and the deferred commit already happened,
+        # so the read failure must not trigger a write retry.
+        assert "claim operation failed" in status.invoke(args)
+        call_upstream(graph.graph, "rebuild_temporal_indexes")
+        assert json.loads(status.invoke(args))["status"] == "supported"
+        stored = graph.graph.get_claim_as_of(version.logical_id, valid_time=VALID_TIME)
+        assert stored.version_id == version.version_id

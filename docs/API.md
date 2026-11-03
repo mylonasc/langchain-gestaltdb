@@ -22,6 +22,9 @@ Import from `langchain_gestaltdb`:
 | `GestaltDBClaimAssertTool` | Opt-in append-only sourced assertion/denial |
 | `GestaltDBClaimCorrectTool` | Opt-in append-only claim correction |
 | `GestaltDBClaimRetractTool` | Opt-in append-only claim retraction |
+| `GestaltDBEntailsTool` | Read-only bounded modal entailment with four-valued status |
+| `GestaltDBWorldAccessibilityTool` | Opt-in append-only world-accessibility assertion |
+| `GestaltDBModalToolkit` | Consistently configured modal tools (read-only by default) |
 | `ReadOnlyQueryError` | Query could not be proven read-only |
 
 `GraphDocument.from_external(model_or_mapping)` validates equivalent fields
@@ -201,6 +204,38 @@ responses have the same keys whether found or missing (null identities and empty
 lists for missing claims). Search treats omitted or null `object` as any object;
 null-literal lookup is available through status instead. A search without indexed
 filters scans the full catalog, regardless of the output cap.
+
+Deferred claim writes (raw database API with `index_mode=DEFER`) make the
+temporal index family stale; indexed claim reads then fail closed until the
+trusted application calls `rebuild_temporal_indexes()`. The toolkits never
+rebuild implicitly. Historical reads accept either `system_time` or
+`through_commit` (an inclusive commit-ordinal prefix horizon; commit IDs are
+never reused): prefer `through_commit` when replaying an exact write receipt
+and `system_time` when aligning with external timestamps.
+
+## Modal entailment tools
+
+`GestaltDBModalToolkit(graph=graph)` returns the read-only
+`gestaltdb_entails` tool; `allow_writes=True` additionally exposes the
+opt-in append-only `gestaltdb_world_accessibility_assert` tool. Entailment
+evaluates one modal formula (`BELIEVES`, `KNOWS`, `POSSIBLE` or `NECESSARY`,
+case-insensitive) for one agent in one world at a valid/system time, in a
+single pinned read view. It is the same bounded evaluator as
+`CALL kg.entails(...) YIELD status, confidence, explanation` (which requires
+`world` and `validTime`, with optional `systemTime`): the tool returns the same
+four-valued `status` (`supported`/`refuted`/`both`/`unknown`), `confidence`
+and evaluation `explanation`, so procedure output and tool output agree.
+
+Frames are independent: `BELIEVES` follows `belief` links, `KNOWS` follows
+`knowledge` links, and `POSSIBLE`/`NECESSARY` follow `modal` links. Missing
+accessibility in the evaluated frame is `unknown`, never false, and
+contradictions yield `both` without entailing unrelated atoms. Formulas accept
+atoms plus `NOT`/`AND`/`OR` and nested modal operators. Bounds (`max_depth`,
+`max_states`) are application-controlled at construction; extra agent arguments
+are rejected, and bound exhaustion fails closed with a redacted error rather
+than a partial verdict. Accessibility links are temporal claims with explicit
+validity, so deferred external writes need the same trusted rebuild as
+deferred claim writes before indexed reads.
 
 ## Tested platform and non-goals
 

@@ -16,6 +16,7 @@ from langchain_gestaltdb.claims import (
     GestaltDBClaimStatusTool,
 )
 from langchain_gestaltdb.graph import GestaltDBGraph
+from langchain_gestaltdb.modal import GestaltDBEntailsTool, GestaltDBWorldAccessibilityTool
 from langchain_gestaltdb.tools import GestaltDBQueryTool, GestaltDBSchemaTool
 
 
@@ -87,5 +88,39 @@ class GestaltDBClaimToolkit(BaseToolkit):
                     GestaltDBClaimCorrectTool(graph=self.graph, max_chars=self.max_chars),
                     GestaltDBClaimRetractTool(graph=self.graph, max_chars=self.max_chars),
                 ]
+            )
+        return tools
+
+
+class GestaltDBModalToolkit(BaseToolkit):
+    """Bounded modal entailment; accessibility writes require explicit opt-in.
+
+    The entails tool is read-only: it evaluates one modal formula in a pinned
+    bitemporal view with application-controlled ``max_depth``/``max_states``
+    bounds that no agent input can change. ``allow_writes=True`` additionally
+    exposes the append-only world-accessibility assertion tool, mirroring the
+    claim-write tools (same commit receipts, same redacted failures).
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    graph: GestaltDBGraph = Field(exclude=True)
+    allow_writes: StrictBool = Field(default=False, exclude=True)
+    max_depth: int = Field(default=4, ge=1, le=1000, exclude=True)
+    max_states: int = Field(default=1000, ge=1, le=1_000_000, exclude=True)
+    max_chars: int = Field(default=16_000, ge=256, le=1_000_000, exclude=True)
+
+    def get_tools(self) -> list[BaseTool]:
+        """Construct tools without transferring ownership of the graph handle."""
+        tools: list[BaseTool] = [
+            GestaltDBEntailsTool(
+                graph=self.graph,
+                max_depth=self.max_depth,
+                max_states=self.max_states,
+                max_chars=self.max_chars,
+            ),
+        ]
+        if self.allow_writes:
+            tools.append(
+                GestaltDBWorldAccessibilityTool(graph=self.graph, max_chars=self.max_chars)
             )
         return tools
