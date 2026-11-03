@@ -26,6 +26,20 @@ def test_executable_offline_example() -> None:
     ]
 
 
+def test_executable_agent_workflow_example() -> None:
+    example = Path(__file__).resolve().parents[2] / "examples" / "agent_workflow.py"
+    result = subprocess.run(
+        [sys.executable, str(example)], check=True, capture_output=True, text=True
+    )
+    answer = json.loads(result.stdout)
+    assert answer["query_rows"] == [{"person": "Alice", "employer": "Acme"}]
+    assert answer["query_truncated"] is False
+    assert answer["retrieved_ids"] == ["acme", "alice"]
+    assert answer["claim_status"] == "supported"
+    assert answer["claims_found"] == 1
+    assert answer["explanation_truncated"] is False
+
+
 def test_real_deferred_indexes_schema_bypass_and_query_rebuild(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         node = Node("a", labels=["Deferred"], properties={"name": "Alice"})
