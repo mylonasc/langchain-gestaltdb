@@ -16,6 +16,13 @@ from langchain_gestaltdb.claims import (
     GestaltDBClaimStatusTool,
 )
 from langchain_gestaltdb.graph import GestaltDBGraph
+from langchain_gestaltdb.rules import (
+    GestaltDBRuleCreateTool,
+    GestaltDBRuleGetTool,
+    GestaltDBRuleListTool,
+    GestaltDBRuleMaintainTool,
+    GestaltDBRuleRunTool,
+)
 from langchain_gestaltdb.tools import GestaltDBQueryTool, GestaltDBSchemaTool
 
 
@@ -80,6 +87,68 @@ class GestaltDBClaimToolkit(BaseToolkit):
                 max_chars=self.max_chars,
             ),
         ]
+        if self.allow_writes:
+            tools.extend(
+                [
+                    GestaltDBClaimAssertTool(graph=self.graph, max_chars=self.max_chars),
+                    GestaltDBClaimCorrectTool(graph=self.graph, max_chars=self.max_chars),
+                    GestaltDBClaimRetractTool(graph=self.graph, max_chars=self.max_chars),
+                ]
+            )
+        return tools
+
+
+class GestaltDBRuleToolkit(BaseToolkit):
+    """Horn-rule toolkit; run/create/maintain require explicit trusted opt-in.
+
+    Rules derive entity claims within one world, so the read tools (get/list)
+    are safe by default. ``allow_writes=True`` additionally exposes append-only
+    rule creation, bounded fixpoint evaluation and truth maintenance, mirroring
+    the claim-write toolkit. Construction bounds are application-controlled and
+    cannot be changed by an agent.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    graph: GestaltDBGraph = Field(exclude=True)
+    allow_writes: StrictBool = Field(default=False, exclude=True)
+    max_rules: int = Field(default=50, ge=1, le=1000, exclude=True)
+    max_versions: int = Field(default=50, ge=1, le=1000, exclude=True)
+    max_iterations: int = Field(default=100, ge=1, le=100_000, exclude=True)
+    max_derivations: int = Field(default=10_000, ge=1, le=1_000_000, exclude=True)
+    max_justifications: int = Field(default=100_000, ge=1, le=10_000_000, exclude=True)
+    max_chars: int = Field(default=16_000, ge=256, le=1_000_000, exclude=True)
+
+    def get_tools(self) -> list[BaseTool]:
+        """Construct tools without transferring ownership of the graph handle."""
+        tools: list[BaseTool] = [
+            GestaltDBRuleGetTool(graph=self.graph, max_chars=self.max_chars),
+            GestaltDBRuleListTool(
+                graph=self.graph, max_rules=self.max_rules, max_chars=self.max_chars
+            ),
+        ]
+        if self.allow_writes:
+            tools.extend(
+                [
+                    GestaltDBRuleCreateTool(graph=self.graph, max_chars=self.max_chars),
+                    GestaltDBRuleRunTool(
+                        graph=self.graph,
+                        max_iterations=self.max_iterations,
+                        max_derivations=self.max_derivations,
+                        max_justifications=self.max_justifications,
+                        max_versions=self.max_versions,
+                        max_chars=self.max_chars,
+                    ),
+                    GestaltDBRuleMaintainTool(
+                        graph=self.graph,
+                        max_iterations=self.max_iterations,
+                        max_derivations=self.max_derivations,
+                        max_justifications=self.max_justifications,
+                        max_versions=self.max_versions,
+                        max_chars=self.max_chars,
+                    ),
+                ]
+            )
+        return tools
         if self.allow_writes:
             tools.extend(
                 [
