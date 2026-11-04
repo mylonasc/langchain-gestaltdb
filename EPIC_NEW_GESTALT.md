@@ -23,11 +23,12 @@ Reference: `gestaltdb==0.17.0` pinned in `pyproject.toml`
 source of truth for upstream behavior. `gestaltdb.graphdb.GraphDB/Node/Edge` are the only
 supported imports (see `AGENTS.md`).
 
-Status: the G17-01–G17-12 slices ship in `0.2.0` on `main` (compat bridge,
+Status: complete. The G17-01–G17-12 slices ship in `0.2.0` on `main` (compat bridge,
 lifecycle/Cypher/bitemporal reads, schema/index advice, bulk ingestion,
 sampling, temporal tools, rules, modal entailment, visualization, docs),
 tested against `gestaltdb==0.17.0`. The `0.1.x` line stays on the 0.12 pin.
-See `docs/COMPAT_0_17.md`.
+All children closed, `0.2.0` published, and the integration/feature branches
+deleted. See `docs/COMPAT_0_17.md`.
 
 ## 1. Outcome and scope
 

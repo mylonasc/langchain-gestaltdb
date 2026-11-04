@@ -23,6 +23,10 @@ compat bridge keeps facade-first resolution for mixed call sites.
   native vector store or computational timeout is claimed. Read-only tools are
   not a multitenant sandbox. See `docs/API.md` and `TECH_DEBT.md` before
   deployment.
+- Completes EPIC-G17 ([#38](https://github.com/mylonasc/langchain-gestaltdb/issues/38)):
+  all twelve slices
+  ([#39](https://github.com/mylonasc/langchain-gestaltdb/issues/39)–[#50](https://github.com/mylonasc/langchain-gestaltdb/issues/50))
+  merged to `main`; the integration branch and merged feature branches were removed.
 
 ## [0.1.1] - 2026-10-18
 
