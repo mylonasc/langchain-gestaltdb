@@ -188,9 +188,8 @@ def test_scan_bounds_entities_and_chars(history_graph: GestaltDBGraph) -> None:
 
 
 def test_read_view_pins_repeated_reads(history_graph: GestaltDBGraph) -> None:
-    database = history_graph.graph
     try:
-        with database.read_view(valid_time=_iso(T1)) as view:
+        with history_graph.read_view(valid_time=_iso(T1)) as view:
             first = view.get_node_as_of("bob", valid_time=_iso(T1))
             second = view.get_node_as_of("bob", valid_time=_iso(T1))
     except Exception as exc:

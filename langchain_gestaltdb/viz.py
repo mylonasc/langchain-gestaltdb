@@ -64,6 +64,25 @@ def _require_viz_api() -> Any:
         ) from exc
 
 
+def _viz_cap_error_type() -> type[BaseException] | None:
+    """Locate ``VizCapExceededError`` across supported ``gestaltdb.viz`` layouts.
+
+    The exception is exported from ``gestaltdb.viz`` (and defined in
+    ``gestaltdb.viz.ir``) on both 0.12 and 0.17, not from ``gestaltdb.viz.api``.
+    Keep the lookup lazy and tolerant so an older packaged layout still gets a
+    useful error rather than a spurious ``AttributeError``.
+    """
+    for target in ("gestaltdb.viz", "gestaltdb.viz.ir", "gestaltdb.viz.api"):
+        try:
+            module = importlib.import_module(target)
+        except ImportError:
+            continue
+        candidate = getattr(module, "VizCapExceededError", None)
+        if isinstance(candidate, type) and issubclass(candidate, BaseException):
+            return candidate
+    return None
+
+
 def _banner_text(nodes_dropped: int, edges_dropped: int, max_nodes: int, max_edges: int) -> str:
     """Mirror the viewer's on-canvas capped-sample banner as plain text."""
     return (
@@ -159,8 +178,8 @@ def render_artifact(
         except ReadOnlyQueryError:
             raise
         except Exception as exc:
-            cap_error = getattr(api, "VizCapExceededError", ())
-            if isinstance(cap_error, type) and isinstance(exc, cap_error):
+            cap_error = _viz_cap_error_type()
+            if cap_error is not None and isinstance(exc, cap_error):
                 raise ValueError(
                     f"Visualization exceeds the absolute ceiling "
                     f"({_CEILING_MULTIPLIER}x caps: "

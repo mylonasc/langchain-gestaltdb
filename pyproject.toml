@@ -73,3 +73,12 @@ ignore_missing_imports = true
 module = ["numpy", "numpy.*"]
 follow_imports = "skip"
 follow_imports_for_stubs = true
+
+[[tool.mypy.overrides]]
+# Optional bulk-ingestion dependencies are imported lazily behind an install
+# hint and are not part of the runtime contract. Treat them as opaque when
+# present instead of pinning third-party stub versions.
+module = ["polars", "polars.*", "pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+follow_imports_for_stubs = true

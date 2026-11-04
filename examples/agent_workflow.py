@@ -15,6 +15,7 @@ from typing import Any
 from langchain_core.documents import Document
 
 from langchain_gestaltdb import (
+    GestaltDBClaimAssertTool,
     GestaltDBClaimToolkit,
     GestaltDBGraph,
     GestaltDBRetriever,
@@ -45,16 +46,19 @@ def run_example(backend: str = "pyrex") -> dict[str, Any]:
             # Trusted setup (not agent input): index for exact-match seeding and
             # one sourced claim for the status/search/explanation tools.
             graph.graph.create_node_property_index("name")
-            graph.graph.assert_claim(
-                subject="alice",
-                predicate="WORKS_FOR",
-                object="acme",
-                polarity="positive",
-                agent="source:hr",
-                source="hr.csv",
-                confidence=0.9,
-                world="reported",
-                valid_from="2024-01-01T00:00:00Z",
+            GestaltDBClaimAssertTool(graph=graph).invoke(
+                {
+                    "subject": "alice",
+                    "predicate": "WORKS_FOR",
+                    "object": "acme",
+                    "polarity": "positive",
+                    "agent": "source:hr",
+                    "source": "hr.csv",
+                    "confidence": 0.9,
+                    "world": "reported",
+                    "valid_from": "2024-01-01T00:00:00Z",
+                    "provenance": {},
+                }
             )
 
             # 1. Schema, then index check via the schema metadata.
