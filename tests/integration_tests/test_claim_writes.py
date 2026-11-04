@@ -5,12 +5,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from gestaltdb.graphdb import IndexMaintenanceMode
 from pydantic import ValidationError
 
 from langchain_gestaltdb import (
     GestaltDBClaimToolkit,
     GestaltDBGraph,
 )
+from langchain_gestaltdb._compat import call_upstream
 
 VALID_TIME = "2024-06-01T00:00:00Z"
 READ_ONLY_NAMES = [
@@ -287,7 +289,9 @@ def test_validity_changes_and_output_bounds(tmp_path: Path) -> None:
         assert len(output) <= 256
         assert receipt["written"] is True
         assert receipt["truncated"] is True
-        stored = graph.graph.get_claim_as_of(receipt["logical_id"], valid_time=VALID_TIME)
+        stored = call_upstream(
+            graph.graph, "get_claim_as_of", receipt["logical_id"], valid_time=VALID_TIME
+        )
         assert stored.version_id == receipt["version_id"]
 
 
@@ -295,7 +299,9 @@ def test_write_failures_are_redacted(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         tools = _write_tools(graph)
         with patch.object(
-            graph.graph, "assert_claim", side_effect=RuntimeError("/private/path secret-token")
+            graph.graph.epistemic,
+            "assert_claim",
+            side_effect=RuntimeError("/private/path secret-token"),
         ):
             output = tools["gestaltdb_claim_assert"].invoke(
                 {
@@ -310,7 +316,9 @@ def test_write_failures_are_redacted(tmp_path: Path) -> None:
             )
         assert "claim write failed" in output
         assert "secret" not in output
-        with patch.object(graph.graph, "retract_claim", side_effect=RuntimeError("/private/path")):
+        with patch.object(
+            graph.graph.epistemic, "retract_claim", side_effect=RuntimeError("/private/path")
+        ):
             retracted = tools["gestaltdb_claim_retract"].invoke(
                 {"claim_id": "claim:x", "supersedes_version_id": "v"}
             )
@@ -350,7 +358,7 @@ def test_executable_offline_write_example() -> None:
 )
 def test_invalid_assertion_never_calls_backend(tmp_path: Path, overrides: dict) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
-        with patch.object(graph.graph, "assert_claim") as write:
+        with patch.object(graph.graph.epistemic, "assert_claim") as write:
             with pytest.raises(ValidationError):
                 _assert(_write_tools(graph), **overrides)
             write.assert_not_called()
@@ -360,7 +368,7 @@ def test_missing_provenance_and_toolkit_coercion_are_rejected(tmp_path: Path) ->
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         with pytest.raises(ValidationError):
             GestaltDBClaimToolkit(graph=graph, allow_writes="true")
-        with patch.object(graph.graph, "assert_claim") as write:
+        with patch.object(graph.graph.epistemic, "assert_claim") as write:
             with pytest.raises(ValidationError):
                 _write_tools(graph)["gestaltdb_claim_assert"].invoke(
                     {
@@ -380,7 +388,7 @@ def test_exact_retraction_target_is_required_and_identity_checked(tmp_path: Path
         tools = _write_tools(graph)
         asserted = _assert(tools)
         ghost = "claim:" + "0" * 64
-        with patch.object(graph.graph, "retract_claim") as write:
+        with patch.object(graph.graph.epistemic, "retract_claim") as write:
             with pytest.raises(ValidationError):
                 tools["gestaltdb_claim_retract"].invoke(
                     {
@@ -400,7 +408,9 @@ def test_exact_retraction_target_is_required_and_identity_checked(tmp_path: Path
                 }
             )
             assert "claim write failed" in output
-            current = graph.graph.get_claim_as_of(asserted["logical_id"], valid_time=VALID_TIME)
+            current = call_upstream(
+                graph.graph, "get_claim_as_of", asserted["logical_id"], valid_time=VALID_TIME
+            )
             assert current.version_id == asserted["version_id"]
 
 
@@ -414,7 +424,11 @@ def test_bounded_receipts_confirm_all_three_commits(tmp_path: Path) -> None:
                 max_chars=256,
             ).get_tools()
         }
-        with patch.object(graph.graph, "assert_claim", wraps=graph.graph.assert_claim) as write:
+        with patch.object(
+            graph.graph.epistemic,
+            "assert_claim",
+            wraps=graph.graph.epistemic.assert_claim,
+        ) as write:
             asserted = _assert(tools, provenance={"long": "evidence" * 1000})
             assert write.call_count == 1
         corrected = json.loads(
@@ -426,7 +440,9 @@ def test_bounded_receipts_confirm_all_three_commits(tmp_path: Path) -> None:
                 }
             )
         )
-        current = graph.graph.get_claim_as_of(asserted["logical_id"], valid_time=VALID_TIME)
+        current = call_upstream(
+            graph.graph, "get_claim_as_of", asserted["logical_id"], valid_time=VALID_TIME
+        )
         assert current.claim.confidence == 0.8
         retracted = json.loads(
             tools["gestaltdb_claim_retract"].invoke(
@@ -441,8 +457,15 @@ def test_bounded_receipts_confirm_all_three_commits(tmp_path: Path) -> None:
             assert receipt["truncated"] is True
             assert receipt["logical_id"] == asserted["logical_id"]
             assert len(json.dumps(receipt, ensure_ascii=False)) <= 256
-        assert graph.graph.get_claim_as_of(asserted["logical_id"], valid_time=VALID_TIME) is None
-        historical = graph.graph.get_claim_as_of(
+        assert (
+            call_upstream(
+                graph.graph, "get_claim_as_of", asserted["logical_id"], valid_time=VALID_TIME
+            )
+            is None
+        )
+        historical = call_upstream(
+            graph.graph,
+            "get_claim_as_of",
             asserted["logical_id"],
             valid_time=VALID_TIME,
             through_commit=current.commit_id,
@@ -457,7 +480,9 @@ def test_receipt_survives_full_payload_serialization_failure(tmp_path: Path) -> 
         ):
             receipt = _assert(_write_tools(graph))
         assert receipt["written"] is True
-        stored = graph.graph.get_claim_as_of(receipt["logical_id"], valid_time=VALID_TIME)
+        stored = call_upstream(
+            graph.graph, "get_claim_as_of", receipt["logical_id"], valid_time=VALID_TIME
+        )
         assert stored.version_id == receipt["version_id"]
 
 
@@ -470,7 +495,7 @@ def test_invalid_interval_does_not_reach_write_api(tmp_path: Path, operation: st
             {"valid_from": VALID_TIME, "valid_to": VALID_TIME},
             {"valid_to": VALID_TIME},
         ):
-            with patch.object(graph.graph, f"{operation}_claim") as write:
+            with patch.object(graph.graph.epistemic, f"{operation}_claim") as write:
                 with pytest.raises(ValidationError):
                     tools[f"gestaltdb_claim_{operation}"].invoke(
                         {
@@ -480,3 +505,38 @@ def test_invalid_interval_does_not_reach_write_api(tmp_path: Path, operation: st
                         }
                     )
                 write.assert_not_called()
+
+
+def test_deferred_claim_write_stale_rebuild_read(tmp_path: Path) -> None:
+    with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
+        version = call_upstream(
+            graph.graph,
+            "assert_claim",
+            subject="alice",
+            predicate="WORKS_FOR",
+            object="acme",
+            polarity="positive",
+            agent="source:hr",
+            world="reported",
+            valid_from="2024-01-01T00:00:00Z",
+            index_mode=IndexMaintenanceMode.DEFER,
+        )
+        status = {tool.name: tool for tool in GestaltDBClaimToolkit(graph=graph).get_tools()}[
+            "gestaltdb_claim_status"
+        ]
+        args = {
+            "subject": "alice",
+            "predicate": "WORKS_FOR",
+            "object": "acme",
+            "valid_time": VALID_TIME,
+        }
+        # Indexed reads fail closed on stale temporal indexes; the toolkit
+        # never rebuilds implicitly and the deferred commit already happened,
+        # so the read failure must not trigger a write retry.
+        assert "claim operation failed" in status.invoke(args)
+        call_upstream(graph.graph, "rebuild_temporal_indexes")
+        assert json.loads(status.invoke(args))["status"] == "supported"
+        stored = call_upstream(
+            graph.graph, "get_claim_as_of", version.logical_id, valid_time=VALID_TIME
+        )
+        assert stored.version_id == version.version_id

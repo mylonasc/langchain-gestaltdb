@@ -11,8 +11,23 @@ from gestaltdb.graphdb import GraphDB
 DIALECT_GUIDANCE = (
     "Use parameterized GestaltDB Cypher (not all Neo4j syntax is supported). "
     "Node types are native labels; relationship types are stored in properties['type']. "
-    "Use MATCH/OPTIONAL MATCH, WHERE, WITH, UNWIND, RETURN, UNION and supported functions. "
-    "Pattern comprehensions, exists(pattern), APOC and arbitrary procedures are unsupported. "
+    "Supported patterns: labeled nodes with inline property maps, {id: $id} entity IDs, "
+    "label expressions, typed/untyped fixed traversal, anonymous elements, "
+    "comma-separated parts, relationship property maps and path bindings. "
+    "Supported clauses: MATCH/OPTIONAL MATCH, WHERE, WITH, UNWIND, RETURN, "
+    "UNION [ALL] and correlated CALL { ... }. "
+    "Supported aggregates: count/collect/sum/avg/min/max with DISTINCT and count(*). "
+    "Supported paths: variable-length and shortest paths; use the legacy *min..max form. "
+    "Supported schema commands: SHOW INDEX/SHOW INDEXES and SHOW CONSTRAINTS are read-only; "
+    "single-property UNIQUE/IS NOT NULL CREATE/DROP CONSTRAINT are write-gated. "
+    "Supported procedures (allowlisted only): pg.sample_typed_paths and kg.entails; "
+    "kg.entails requires world and validTime options. "
+    "Property indexes are explicit: the trusted application creates them with "
+    "create_node_property_index/create_edge_property_index and rebuilds deferred "
+    "ingests with rebuild_deferred_indexes(); use the gestaltdb_index_advisor tool to "
+    "check existence and staleness before relying on an index. "
+    "Unsupported: pattern comprehensions, exists(pattern), GQL quantifiers, "
+    "relationship or multi-property constraints, APOC and arbitrary procedures. "
     "Schema is sampled unless explicitly configured otherwise; "
     "missing properties are not forbidden. "
     "Output limits are not execution timeouts. Claims are separate from ordinary graph edges."
@@ -45,9 +60,17 @@ def discover_schema(
     This is approximate discovery, not a concurrent database-wide snapshot.
     """
     node_keys = list(
-        islice(graph.get_node_keys_generator(), None if node_limit is None else node_limit + 1)
+        islice(
+            graph.get_node_keys_generator(),  # type: ignore[no-untyped-call]
+            None if node_limit is None else node_limit + 1,
+        )
     )
-    edge_keys = list(islice(graph.iter_edge_ids(), None if edge_limit is None else edge_limit + 1))
+    edge_keys = list(
+        islice(
+            graph.iter_edge_ids(),  # type: ignore[no-untyped-call]
+            None if edge_limit is None else edge_limit + 1,
+        )
+    )
     nodes_truncated = node_limit is not None and len(node_keys) > node_limit
     edges_truncated = edge_limit is not None and len(edge_keys) > edge_limit
     node_keys = node_keys[:node_limit]
@@ -62,6 +85,8 @@ def discover_schema(
             continue
         endpoints = []
         for endpoint in (edge.source, edge.target):
+            if endpoint is None:
+                raise ValueError(f"Edge {edge.get_id!r} is missing an endpoint")
             key = endpoint.encode("utf-8") if isinstance(endpoint, str) else endpoint.get_id_bytes
             if key not in nodes:
                 nodes[key] = graph.get_node(key)
@@ -96,6 +121,21 @@ def discover_schema(
             for label, props in sorted(values.items())
         }
 
+    stale: tuple[str, ...]
+    try:
+        stale = tuple(graph.stale_indexes())
+    except Exception:
+        stale = ()
+    try:
+        index_definitions = dict(graph.index_statistics())
+    except Exception:
+        index_definitions = {}
+    constraints: list[dict[str, Any]]
+    try:
+        constraints = [dict(record) for record in graph.query("SHOW CONSTRAINTS").records]
+    except Exception:
+        constraints = []
+
     return {
         "node_props": properties(node_props),
         "rel_props": properties(rel_props),
@@ -108,7 +148,11 @@ def discover_schema(
             "inspected_nodes": sum(node is not None for node in nodes.values()),
             "inspected_edges": sum(edge is not None for edge in edges),
             "truncated": nodes_truncated or edges_truncated,
-            "indexes": graph.index_statistics(),
+            "indexes": index_definitions,
+            "index_definitions": index_definitions,
+            "stale_indexes": sorted(stale),
+            "temporal_indexes_current": "temporal" not in stale,
+            "constraints": constraints,
             "dialect": DIALECT_GUIDANCE,
         },
     }

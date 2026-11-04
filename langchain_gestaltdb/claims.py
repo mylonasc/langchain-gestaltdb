@@ -22,6 +22,7 @@ from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool, ToolException
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+from langchain_gestaltdb._compat import call_upstream
 from langchain_gestaltdb._serialization import normalize
 from langchain_gestaltdb._tool_output import bounded_json
 from langchain_gestaltdb.graph import GestaltDBGraph
@@ -209,7 +210,13 @@ class GestaltDBClaimStatusTool(_ClaimTool):
                 filters["through_commit"] = through_commit
             statement_id = claim_statement_id(subject, predicate, object, object_kind=object_kind)
             versions = list(
-                graph.iter_claims_as_of(valid_time=valid_time, statement_id=statement_id, **filters)
+                call_upstream(
+                    graph,
+                    "iter_claims_as_of",
+                    valid_time=valid_time,
+                    statement_id=statement_id,
+                    **filters,
+                )
             )
             # Match upstream's four-valued policy, using the same resolution for
             # status and evidence. Compute before capping contradictory evidence.
@@ -300,7 +307,7 @@ class GestaltDBClaimSearchTool(_ClaimTool):
                 kwargs["system_time"] = system_time
             if through_commit is not None:
                 kwargs["through_commit"] = through_commit
-            versions = list(graph.iter_claims_as_of(**kwargs))
+            versions = list(call_upstream(graph, "iter_claims_as_of", **kwargs))
             claims = [_serialize_claim_version(version) for version in versions]
         except Exception:
             raise ToolException(_CLAIM_ERROR) from None
@@ -349,7 +356,9 @@ class GestaltDBClaimExplanationTool(_ClaimTool):
         run_manager: CallbackManagerForToolRun | None = None,
     ) -> str:
         try:
-            explanation = self.graph.graph.explain_claim(
+            explanation = call_upstream(
+                self.graph.graph,
+                "explain_claim",
                 claim_id,
                 valid_time=valid_time,
                 system_time=system_time,

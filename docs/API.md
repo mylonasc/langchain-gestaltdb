@@ -22,10 +22,50 @@ Import from `langchain_gestaltdb`:
 | `GestaltDBClaimAssertTool` | Opt-in append-only sourced assertion/denial |
 | `GestaltDBClaimCorrectTool` | Opt-in append-only claim correction |
 | `GestaltDBClaimRetractTool` | Opt-in append-only claim retraction |
+| `GestaltDBEntailsTool` | Read-only bounded modal entailment with four-valued status |
+| `GestaltDBWorldAccessibilityTool` | Opt-in append-only world-accessibility assertion |
+| `GestaltDBModalToolkit` | Consistently configured modal tools (read-only by default) |
+| `GestaltDBNodeAsOfTool` | Read-only node version at a bitemporal horizon |
+| `GestaltDBEdgeAsOfTool` | Read-only edge version at a bitemporal horizon |
+| `GestaltDBTemporalScanTool` | Read-only bounded node/edge version scan |
+| `GestaltDBTemporalToolkit` | Consistently configured temporal read tools |
+| `GestaltDBRuleGetTool` | Read-only rule version lookup |
+| `GestaltDBRuleListTool` | Read-only bounded rule-version listing |
+| `GestaltDBRuleCreateTool` | Opt-in append-only rule version creation |
+| `GestaltDBRuleRunTool` | Opt-in bounded rule fixpoint evaluation |
+| `GestaltDBRuleMaintainTool` | Opt-in incremental truth maintenance |
+| `GestaltDBRuleToolkit` | Consistently configured rule tools (read-only by default) |
+| `GestaltDBSamplingTool` | Bounded multi-hop typed path/subgraph sampling |
+| `SamplingHopInput` / `SamplingInput` | Sampling tool input models |
+| `GestaltDBIndexAdvisorTool` / `advise_index` | Read-only property-index advice; agents never run DDL |
+| `GestaltDBVizTool` | Opt-in offline visualization artifact tool (bounded summary) |
+| `render_artifact` | Trusted-app offline HTML/SVG artifact helper (bounded summary) |
+| `VizDependencyError` | Packaged `gestaltdb.viz` module is unavailable |
 | `ReadOnlyQueryError` | Query could not be proven read-only |
 
 `GraphDocument.from_external(model_or_mapping)` validates equivalent fields
 without installing Community or Neo4j. This is not inheritance/chain compatibility.
+
+## Agent-backend tool map (G17 integration surface)
+
+Status key: every row below ships in `0.2.0` on `main` (developed as
+G17-01…G17-12 on `integration/gestalt-agent-backend`); **runbook** has no
+agent tool by design and stays with the trusted application. The full
+agent sequence is described in `docs/AGENT_WORKFLOW.md`; deployment limits live
+in `docs/LIMITS.md`.
+
+| Tool / helper | Module | Status | Notes |
+| --- | --- | --- | --- |
+| `call_upstream` / `service_layout` compat bridge | `langchain_gestaltdb._compat` | 0.2.0 (G17-01) | facade-preferred, service-fallback; `explain_claim->rules.explain`, `run_rules->run`, `maintain_truth->maintain`; `open_read_view` / `evaluate_entailment` bridge `read_view` and the pinned-view `entails` signature |
+| Lifecycle inspection (`manifest`, `database_id`, `index_statistics`, `stale_indexes`) + `read_snapshot` / `read_view` semantics | `GestaltDBGraph` | 0.2.0 (G17-02) | read-only passthroughs, fail closed when closed; `adapter.read_view(...)` works on both facade and services layouts; LMDB snapshots verifiable, transactional PyRex pins, LevelDB/default PyRex reject explicit snapshots |
+| Read-only policy: `SHOW INDEX[ES]`/`SHOW CONSTRAINTS`, `kg.entails` world+validTime options | `_read_only` | 0.2.0 (G17-03/04) | `CREATE/DROP CONSTRAINT` stays write-gated; temporal qualifiers make queries write-restricted |
+| `advise_index` / `GestaltDBIndexAdvisorTool` | `langchain_gestaltdb.index_advisor` | 0.2.0 (G17-05) | read-only; opt-in via `GestaltDBToolkit(include_index_advisor=True)`; agents never run DDL |
+| `ingest_polars` / `ingest_arrow` | `GestaltDBGraph` | 0.2.0 (G17-06) | trusted-app bulk helper, not an agent tool; `MAINTAIN`/`DEFER`/`DEFER_REBUILD`, chunked, no whole-import atomicity |
+| `GestaltDBSamplingTool` (`gestaltdb_sample_paths`) | `langchain_gestaltdb.sampling` | 0.2.0 (G17-07) | ordered `SamplingPattern`, `paths`/`subgraph` modes, decoded IDs, deterministic order |
+| Temporal as-of tools (`gestaltdb_node_as_of`, `gestaltdb_edge_as_of`, `gestaltdb_temporal_scan`) | `langchain_gestaltdb.temporal_tools` | 0.2.0 (G17-08) | read-only bounded versions at valid/system horizons; migration/orphan recovery stays a trusted-app runbook |
+| Rule read/write tools (`gestaltdb_rule_get/list/create/run/maintain`) | `langchain_gestaltdb.rules` | 0.2.0 (G17-09) | get/list read-only; create/run/maintain opt-in via `GestaltDBRuleToolkit(allow_writes=True)` |
+| Modal entailment tools (`gestaltdb_entails`, `gestaltdb_world_accessibility_assert`) | `langchain_gestaltdb.modal` | 0.2.0 (G17-10) | same bounded evaluator as `CALL kg.entails` with `world`+`validTime`; accessibility writes stay opt-in |
+| Visualization artifacts (`GestaltDBVizTool`, `render_artifact`) | `langchain_gestaltdb.viz` | 0.2.0 (G17-11) | trusted app writes HTML/SVG to an explicit path; agent receives a bounded summary plus path |
 
 ## Graph lifecycle and operations
 
@@ -41,10 +81,28 @@ without installing Community or Neo4j. This is not inheritance/chain compatibili
   Opening existing stores is unaffected by the creation default; no migration
   from LMDB or LevelDB is performed.
 - `graph` accesses the raw database only while the wrapper is open.
+- `manifest` / `database_id` are read-only inspection properties; `index_statistics()`
+  reports persisted property-index definitions and `stale_indexes()` reports sorted
+  families needing `graph.rebuild_deferred_indexes()`. All four pass through to the
+  underlying handle and fail closed once the adapter is closed. No raw write
+  transaction is exposed; pin several reads with `adapter.read_view(...)`
+  (temporal horizon; bridges facade `read_view` and services
+  `temporal.open_read_view`) or `adapter.graph.current_read_view()` (backend
+  snapshot).
 - `query(query, params=None, read_snapshot=None)` permits upstream reads/writes;
-  backend/parser errors propagate unchanged.
+  backend/parser errors propagate unchanged. `read_snapshot=None` snapshots
+  automatically where supported, `True` requires one, `False` opts out. LMDB
+  snapshots verifiably (MVCC); transactional PyRex (`backend_options=
+  {"transactional": True}`) pins reads without verifiable provenance; LevelDB and
+  default PyRex reject explicit snapshots with `NotImplementedError`.
 - `query_read_only(query, params=None, allowed_procedures=(), read_snapshot=None)`
   recursively validates before execution. Query length <=10000, AST nesting <=32.
+- `read_view(valid_time=..., system_time=None, through_commit=None)` returns a
+  context manager pinning repeated point-in-time reads to one temporal horizon.
+  It delegates to facade `GraphDB.read_view` where present and to
+  `temporal.open_read_view(graph, manifest=..., database_id=..., ...)` on services layouts,
+  so the same adapter code works on both layouts. Backend snapshot and
+  durability guarantees are unchanged.
 - `get_schema` / `get_structured_schema` are cached text/dictionary properties;
   `refresh_schema()` reloads canonical entities or re-copies the trusted override.
 - `add_graph_documents(iterable, include_source=False)` prevalidates, merges
@@ -100,6 +158,18 @@ Async BaseTool invocation is a thread adapter, not native async or a thread-safe
 promise. JSON bulk relationship writes have an upstream limitation (TD-02);
 ingestion deliberately uses incremental object writes. See `TECH_DEBT.md`.
 
+Trusted apps can also bulk-load columnar tables with
+`GestaltDBGraph.ingest_polars(node_df, edge_df, ...)` and
+`GestaltDBGraph.ingest_arrow(node_ids, edge_ids, sources, targets, edge_types, ...)`.
+These helpers validate frames/columns, accept `node_property_columns` /
+`edge_property_columns`, `chunk_size`, and `index_mode` (`MAINTAIN`, `DEFER`,
+`DEFER_REBUILD` via `gestaltdb.IndexMaintenanceMode` when available), invalidate
+the schema cache, and return `nodes`/`edges`/`rebuilt_indexes`/`stale_indexes`
+counts. They are not agent tools, promise no whole-import atomicity, and leave
+`DEFER`ed indexes stale until the trusted app rebuilds them. CSV-built frames
+need explicit numeric dtypes and one label list per row (bare label strings are
+rejected). `polars`/`pyarrow` stay optional dependencies imported inside the call.
+
 ## Bounded graph retrieval
 
 `GestaltDBRetriever(graph, hops=(), seed_ids=(), seed_label=None,
@@ -136,6 +206,33 @@ flagged truncation. Setting `max_sources_per_entity=0` disables source lookup.
 Caps bound returned entities/content, not execution, intermediate memory or total
 metadata size. Indexed seed candidates are consumed incrementally, with one extra
 valid seed to detect truncation.
+
+## Multi-hop sampling tool
+
+`GestaltDBSamplingTool(graph, max_paths=50, max_nodes=1000, max_edges=2000,
+max_chars=16000, rng_seed=0)` (`gestaltdb_sample_paths`) wraps
+`sample_typed_paths`/`sample_typed_subgraph` over an ordered `SamplingPattern`.
+
+- Agent input: `seed_ids` (explicit node IDs), `hops` (ordered
+  `SamplingHopInput(edge_type, direction=out, sample_size=10)`, `direction`
+  `out`/`in`/`any`), and `mode` (`paths` or `subgraph`). Caps and `rng_seed`
+  are application-controlled.
+- `paths` mode returns decoded `paths` (`seed` plus `edge_id`/`source_id`/
+  `target_id`/`neighbor_id`/`edge_type`/`direction` steps) with
+  `returned_paths` and `truncated`. `subgraph` mode additionally returns
+  `nodes` (`id`/labels/properties) and `edges` (`id`/source/target/type/
+  properties) with their own counts; all lists share one `truncated` flag via
+  the bounded-JSON envelope.
+- Use the retriever for seeded entity documents with source text; use this tool
+  for raw multi-hop paths or a materialized subgraph without per-entity
+  documents or source linking.
+
+Caps: `len(hops) <= 8`, `1 <= sample_size <= 100`, plus `max_paths`,
+`max_nodes`, `max_edges`, `max_chars`. Absent seeds are skipped and never
+fabricated; output ordering is deterministic (sorted) and is **not** a
+relevance ranking. The tool only reads, never writes, and never rebuilds
+indexes; typed adjacency stays usable during deferred edge ingest. Caps bound
+returned output, not execution or intermediate materialization.
 
 ## Claim (epistemic) tools
 
@@ -201,6 +298,85 @@ responses have the same keys whether found or missing (null identities and empty
 lists for missing claims). Search treats omitted or null `object` as any object;
 null-literal lookup is available through status instead. A search without indexed
 filters scans the full catalog, regardless of the output cap.
+
+Deferred claim writes (raw database API with `index_mode=DEFER`) make the
+temporal index family stale; indexed claim reads then fail closed until the
+trusted application calls `rebuild_temporal_indexes()`. The toolkits never
+rebuild implicitly. Historical reads accept either `system_time` or
+`through_commit` (an inclusive commit-ordinal prefix horizon; commit IDs are
+never reused): prefer `through_commit` when replaying an exact write receipt
+and `system_time` when aligning with external timestamps.
+
+## Modal entailment tools
+
+`GestaltDBModalToolkit(graph=graph)` returns the read-only
+`gestaltdb_entails` tool; `allow_writes=True` additionally exposes the
+opt-in append-only `gestaltdb_world_accessibility_assert` tool. Entailment
+evaluates one modal formula (`BELIEVES`, `KNOWS`, `POSSIBLE` or `NECESSARY`,
+case-insensitive) for one agent in one world at a valid/system time, in a
+single pinned read view. It is the same bounded evaluator as
+`CALL kg.entails(...) YIELD status, confidence, explanation` (which requires
+`world` and `validTime`, with optional `systemTime`): the tool returns the same
+four-valued `status` (`supported`/`refuted`/`both`/`unknown`), `confidence`
+and evaluation `explanation`, so procedure output and tool output agree.
+
+Frames are independent: `BELIEVES` follows `belief` links, `KNOWS` follows
+`knowledge` links, and `POSSIBLE`/`NECESSARY` follow `modal` links. Missing
+accessibility in the evaluated frame is `unknown`, never false, and
+contradictions yield `both` without entailing unrelated atoms. Formulas accept
+atoms plus `NOT`/`AND`/`OR` and nested modal operators. Bounds (`max_depth`,
+`max_states`) are application-controlled at construction; extra agent arguments
+are rejected, and bound exhaustion fails closed with a redacted error rather
+than a partial verdict. Accessibility links are temporal claims with explicit
+validity, so deferred external writes need the same trusted rebuild as
+deferred claim writes before indexed reads.
+
+## Visualization artifacts (opt-in)
+
+`render_artifact(graph, mode, output_path, ...)` is the trusted-application
+entry point for offline visualization. `mode` is `"nodes_edges"` (explicit
+collections, no database needed), `"query"` (Cypher matches, enforced read-only
+by the same fail-closed policy as the query tool) or `"sample"` (typed
+subgraph sampling around seeds via `SamplingPattern`, the large-graph path).
+`format` is `"html"` (self-contained offline viewer: the D3.js/React bundle
+is prebuilt and packaged, no network, CDN, remote fonts, server or notebook
+channel) or `"svg"` (dependency-free static `circle`/`grid` layout). The
+artifact is written to the explicit `output_path` (suffix must match the
+format); the returned value is bounded summary JSON with `path`, `format`,
+`mode`, `node_count`/`edge_count`, `truncated`, `nodes_dropped`/`edges_dropped`,
+`banner` and `warning`. Raw HTML/SVG is never returned to the agent.
+
+Caps default to `VizOptions` (2000 nodes / 5000 edges) with absolute ceilings
+at twice the caps. Cap truncation is deterministic, emits `TruncationWarning`
+(captured into the summary) and renders an on-canvas capped-sample banner in
+the viewer (mirrored as summary `banner` text and embedded in static SVG).
+Payloads beyond the absolute ceiling raise an error naming the sampling
+alternative instead of freezing the browser. Visualization imports stay lazy:
+without the packaged `gestaltdb.viz` module, calls fail with
+`VizDependencyError` and an actionable upgrade message.
+
+`GestaltDBVizTool(graph=graph, output_dir=...)` exposes `nodes_edges`/`query`
+modes to agents. The artifact directory is application-controlled; the agent
+supplies only a basename (traversal rejected), and output is bounded by
+`max_chars`. Sample mode needs caller-side seeds/pattern, so it stays in
+`render_artifact`.
+
+## Dialect guidance, workflow, and limits
+
+`DIALECT_GUIDANCE` (`langchain_gestaltdb/_schema.py`) is the supported-Cypher
+summary embedded in schema output. It is refreshed on every upstream minor
+alongside the read-only policy, and any drift from the installed
+`gestaltdb.agent_docs` guides (`list` / `get cypher --examples` /
+`search '<API name>'`) is a docs bug: re-run the agent-docs diff when the
+`gestaltdb` pin moves (see `docs/COMPAT_0_17.md`). Agent planning guidance
+lives in `docs/AGENT_WORKFLOW.md` (schema -> index check -> query/sample/
+retrieve -> temporal/claim check -> explain, with the Cypher vs retriever vs
+sampling vs claim vs entails decision tree, seeding rules, truncation
+envelopes, scan costs, stale-index recovery, per-backend `read_snapshot`, and
+CSV pitfalls). Deployment limits live in `docs/LIMITS.md` (output caps vs
+execution/memory/materialization, backend snapshot differences, no
+sandbox/multitenant claims, TD-04); tool documentation links there instead of
+repeating the full text.
 
 ## Tested platform and non-goals
 

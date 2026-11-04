@@ -1,4 +1,8 @@
-"""LangChain tools with read-only defaults and bounded, valid JSON output."""
+"""LangChain tools with read-only defaults and bounded, valid JSON output.
+
+Deployment limits are consolidated in docs/LIMITS.md; the recommended agent
+sequence is described in docs/AGENT_WORKFLOW.md.
+"""
 
 from __future__ import annotations
 
@@ -43,6 +47,7 @@ class GestaltDBQueryTool(BaseTool):
     Row/character limits apply to returned output, not execution or intermediate
     memory. Read queries can be expensive. BaseTool's default async adapter uses
     threads; this is not a native async database or a concurrency guarantee.
+    See docs/LIMITS.md for the consolidated deployment limits.
     """
 
     name: str = "gestaltdb_query"

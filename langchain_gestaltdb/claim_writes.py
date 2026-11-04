@@ -6,6 +6,26 @@ authority, provenance and confidence are never inferred; the caller must supply
 them explicitly. Every write appends an immutable, bitemporal version, so fact
 validity (``valid``) stays distinct from system knowledge time (``system_time``)
 and prior evidence remains retrievable. There is no delete path.
+
+Deferred index maintenance: these tools always write with index maintenance,
+so their own commits are immediately visible to indexed reads. Claims (or
+world-accessibility links) written through the raw database API with
+``index_mode=DEFER`` instead make the temporal index family stale; indexed
+reads then fail closed (``stale indexes require rebuild``) until the trusted
+application calls ``rebuild_temporal_indexes()`` (or ``rebuild_deferred_indexes()``
+for graph indexes). This toolkit never rebuilds implicitly: surface the stale
+failure to the application, rebuild there, and only then re-read. Never retry a
+write blindly after a stale-read failure; the commit may already exist.
+
+System-knowledge horizons: every receipt carries both ``system_time`` (an
+ISO-8601 knowledge instant) and ``commit_id``/``commit_ordinal``. Historical
+claim reads accept either ``system_time`` or ``through_commit`` (an inclusive
+commit-ordinal prefix horizon); commit IDs are never reused. Prefer
+``through_commit`` when replaying the exact receipt of a just-written version,
+and ``system_time`` when aligning knowledge time with external timestamps.
+Fact validity (``valid_from``/``valid_to``) stays distinct from either horizon:
+retractions narrow validity without deleting history. Truncation
+receipts and retry rules are documented in docs/LIMITS.md.
 """
 
 from __future__ import annotations
@@ -19,6 +39,7 @@ from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool, ToolException
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
+from langchain_gestaltdb._compat import call_upstream
 from langchain_gestaltdb._serialization import normalize
 from langchain_gestaltdb.claims import _serialize_claim_version
 from langchain_gestaltdb.graph import GestaltDBGraph
@@ -133,7 +154,15 @@ class ClaimRetractInput(_ValidityInput):
 
 
 class _ClaimWriteTool(BaseTool):
-    """Shared graph handle, output cap and redacted failure for claim writes."""
+    """Shared graph handle, output cap and redacted failure for claim writes.
+
+    Receipts report the commit that already happened (``written: True`` with
+    ``version_id``/``logical_id`` plus ``commit_id``/``commit_ordinal`` and
+    ``system_time``), so an output cap or serialization failure surfaces as a
+    truncated success, never as an apparent failure that could prompt an unsafe
+    retry. Historical reads use ``through_commit`` to replay an exact receipt
+    or ``system_time`` to align with external timestamps.
+    """
 
     graph: GestaltDBGraph = Field(exclude=True)
     max_chars: int = Field(default=16_000, ge=256, le=1_000_000, exclude=True)
@@ -166,7 +195,9 @@ class GestaltDBClaimAssertTool(_ClaimWriteTool):
     description: str = (
         "Append a sourced positive/negative claim with explicit agent, provenance and fact "
         "validity. Writes are opt-in and append-only; nothing is inferred. Returns the new "
-        "claim version with its system knowledge time."
+        "claim version with its system knowledge time. Writes use index maintenance, so "
+        "the version is immediately readable; deferred external writes need a trusted "
+        "rebuild before indexed reads."
     )
     args_schema: type[BaseModel] = ClaimAssertInput
 
@@ -187,7 +218,9 @@ class GestaltDBClaimAssertTool(_ClaimWriteTool):
         run_manager: CallbackManagerForToolRun | None = None,
     ) -> str:
         try:
-            version = self.graph.graph.assert_claim(
+            version = call_upstream(
+                self.graph.graph,
+                "assert_claim",
                 subject=subject,
                 predicate=predicate,
                 object=object,
@@ -239,7 +272,7 @@ class GestaltDBClaimCorrectTool(_ClaimWriteTool):
                 kwargs["valid_to"] = valid_to
             # Use the logical ID: the Claim-object overload ignores explicit
             # confidence/provenance on GestaltDB 0.12.0 (upstream issue #110).
-            version = self.graph.graph.correct_claim(claim_id, **kwargs)
+            version = call_upstream(self.graph.graph, "correct_claim", claim_id, **kwargs)
         except Exception:
             raise ToolException(_CLAIM_WRITE_ERROR) from None
         return self._result(version)
@@ -275,7 +308,7 @@ class GestaltDBClaimRetractTool(_ClaimWriteTool):
                 kwargs["valid_from"] = valid_from
             if valid_to is not None:
                 kwargs["valid_to"] = valid_to
-            version = self.graph.graph.retract_claim(claim_id, **kwargs)
+            version = call_upstream(self.graph.graph, "retract_claim", claim_id, **kwargs)
         except Exception:
             raise ToolException(_CLAIM_WRITE_ERROR) from None
         return self._result(version)

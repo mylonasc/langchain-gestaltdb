@@ -114,15 +114,15 @@ def ingest(graph: GraphDB, values: Iterable[Any], include_source: bool) -> None:
                 )
     # Finish validation/merges before the first write. Backend I/O failures can
     # still leave a partial import; no cross-backend atomicity is implied.
-    for key, node in nodes.items():
-        existing = graph.get_node(node.get_id_bytes)
+    for key, stored in nodes.items():
+        existing = graph.get_node(stored.get_id_bytes)
         if existing is not None:
             nodes[key] = Node(
                 key,
-                labels=sorted(set(existing.labels) | set(node.labels)),
-                properties={**existing.properties, **node.properties},
+                labels=sorted(set(existing.labels) | set(stored.labels)),
+                properties={**existing.properties, **stored.properties},
             )
-    for node in nodes.values():
-        graph.put_node(node)
+    for stored in nodes.values():
+        graph.put_node(stored)
     for edge in edges.values():
         graph.put_edge(edge)  # TD-02: upstream JSON bulk adjacency is not reliable.

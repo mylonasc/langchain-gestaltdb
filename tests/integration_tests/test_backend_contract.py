@@ -19,6 +19,7 @@ from langchain_gestaltdb import (
     ReadOnlyQueryError,
     RetrievalHop,
 )
+from langchain_gestaltdb._compat import call_upstream
 
 
 def test_backend_ingestion_schema_tool_and_reopen(tmp_path: Path) -> None:
@@ -76,7 +77,9 @@ def test_backend_ingestion_schema_tool_and_reopen(tmp_path: Path) -> None:
 def test_backend_claim_status_and_evidence(tmp_path: Path) -> None:
     backend = os.environ.get("GESTALTDB_TEST_BACKEND", "pyrex")
     with GestaltDBGraph.create(tmp_path / "claims", backend=backend) as graph:
-        graph.graph.assert_claim(
+        call_upstream(
+            graph.graph,
+            "assert_claim",
             subject="alice",
             predicate="WORKS_FOR",
             object="acme",
@@ -146,13 +149,17 @@ def test_backend_claim_writes_are_append_only(tmp_path: Path) -> None:
         assert retracted["written"] is True
         assert retracted["claim"] is None
         assert (
-            graph.graph.get_claim_as_of(
+            call_upstream(
+                graph.graph,
+                "get_claim_as_of",
                 asserted["logical_id"],
                 valid_time="2024-06-01T00:00:00Z",
             )
             is None
         )
-        historical = graph.graph.get_claim_as_of(
+        historical = call_upstream(
+            graph.graph,
+            "get_claim_as_of",
             asserted["logical_id"],
             valid_time="2024-06-01T00:00:00Z",
             through_commit=asserted["commit_id"],

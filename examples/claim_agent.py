@@ -15,6 +15,7 @@ from typing import Any
 from langchain_core.messages import ToolMessage
 
 from langchain_gestaltdb import GestaltDBClaimToolkit, GestaltDBGraph
+from langchain_gestaltdb._compat import call_upstream
 
 
 def run_example(backend: str = "pyrex") -> dict[str, Any]:
@@ -22,7 +23,9 @@ def run_example(backend: str = "pyrex") -> dict[str, Any]:
     with TemporaryDirectory() as directory:
         with GestaltDBGraph.create(Path(directory) / "graph", backend=backend) as graph:
             database = graph.graph
-            database.assert_claim(
+            call_upstream(
+                database,
+                "assert_claim",
                 subject="alice",
                 predicate="WORKS_FOR",
                 object="acme",
@@ -33,7 +36,9 @@ def run_example(backend: str = "pyrex") -> dict[str, Any]:
                 world="reported",
                 valid_from="2024-01-01T00:00:00Z",
             )
-            database.assert_claim(
+            call_upstream(
+                database,
+                "assert_claim",
                 subject="alice",
                 predicate="WORKS_FOR",
                 object="acme",
@@ -44,7 +49,9 @@ def run_example(backend: str = "pyrex") -> dict[str, Any]:
                 world="reported",
                 valid_from="2024-01-01T00:00:00Z",
             )
-            database.assert_claim(
+            call_upstream(
+                database,
+                "assert_claim",
                 subject="acme",
                 predicate="MEMBER_OF",
                 object="industry",
@@ -53,12 +60,14 @@ def run_example(backend: str = "pyrex") -> dict[str, Any]:
                 world="reported",
                 valid_from="2024-03-01T00:00:00Z",
             )
-            database.create_rule(
+            call_upstream(
+                database,
+                "create_rule",
                 "employment-implies-affiliation",
                 when=[("?p", "WORKS_FOR", "?c"), ("?c", "MEMBER_OF", "?g")],
                 then=("?p", "AFFILIATED_WITH", "?g"),
             )
-            derived = database.run_rules(as_of="2024-06-01T00:00:00Z").versions[0]
+            derived = call_upstream(database, "run_rules", as_of="2024-06-01T00:00:00Z").versions[0]
 
             status_tool, _search, explanation_tool = GestaltDBClaimToolkit(graph=graph).get_tools()
             status_call = status_tool.invoke(

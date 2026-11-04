@@ -5,264 +5,78 @@
 <!-- Snapshot value; CI enforces >=90% package coverage in the Python matrix.
      Automating this badge is tracked as TD-05 in TECH_DEBT.md. -->
 
-A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb).
-The graph adapter, schema, ingestion, read-only-default
-agent toolkit, bounded typed-graph retriever, read-only claim status/provenance
-tools, and explicitly enabled claim writes are available. See
-[the bootstrap epic](PROJECT_BOOTSTRAP_EPIC.md) and the
-[technical debt register](TECH_DEBT.md).
-
-Since 0.1.1, PyRex/RocksDB (`pyrex-rocksdb`, GestaltDB backend name `pyrex`) is
-the default: a plain install includes it and `GestaltDBGraph.create(path)` selects
-it. Existing stores still reopen with their persisted backend. Version 0.1.0
-required the `rocksdb` extra and explicit `backend="pyrex"`.
+A graph-first LangChain integration for [GestaltDB](https://github.com/mylonasc/gestaltdb):
+embedded graph lifecycle, parameterized Cypher, bounded schema discovery,
+graph-document ingestion, read-only-default agent tools, bounded typed-graph
+retrieval, bitemporal claim and rule tools, and offline visualization artifacts.
+Requires `gestaltdb>=0.17.0,<0.18` and Python 3.10–3.13. See
+[the API contract](docs/API.md), [the agent workflow](docs/AGENT_WORKFLOW.md),
+and [the deployment limits](docs/LIMITS.md).
 
 ```bash
-pip install 'langchain-gestaltdb==0.1.1'
+pip install 'langchain-gestaltdb==0.2.0'
 ```
 
 ```python
 from langchain_gestaltdb import GestaltDBGraph
 
-with GestaltDBGraph.create("my-graph") as graph:
-    rows = graph.query("MATCH (n) WHERE n.id = $id RETURN n", {"id": "alice"})
+with GestaltDBGraph.create("my-graph") as graph:  # default backend: PyRex/RocksDB
+    graph.query("CREATE (n:Person {id: $id}) RETURN n", {"id": "alice"})
+    rows = graph.query_read_only("MATCH (n:Person) WHERE n.id = $id RETURN n", {"id": "alice"})
 ```
 
-Wrapping an existing `GraphDB` borrows its handle; create/open own their handles.
+`create(path)` selects the persisted backend (`pyrex` by default; a plain
+install includes `pyrex-rocksdb`). `open(path)` reopens with the persisted
+manifest. `lmdb` and `leveldb` are optional extras requiring an explicit
+`backend=` override; missing backends fail explicitly, never fall back.
 Closing a borrowed wrapper leaves the original database open. Queries return
-JSON-compatible dictionaries, including native nodes/edges and paths. Temporal
-values use a `$type` tag plus exact fields; unsupported objects fail explicitly.
-Low-level queries permit writes and propagate upstream errors unchanged: do not
-give this API directly to an untrusted agent. Backend transaction/snapshot
-guarantees are unchanged; there is no native async or execution timeout.
+JSON-compatible dictionaries; temporal values use tagged exact forms.
+`query()` permits writes and propagates upstream errors unchanged: do not hand
+it to an untrusted agent. Transaction/snapshot guarantees vary by backend;
+there is no native async or execution timeout.
 
-For parsed-AST write prevention, call `graph.query_read_only(query, params)`.
-It rejects mutations, schema changes, unknown syntax, and procedures by default,
-including writes inside subqueries/UNION. Known read procedures may be explicitly
-allowlisted by a trusted application. Query text is capped at 10000 characters.
-Read-only is **not** protection against expensive reads: use process/resource
-isolation for hostile workloads. Output caps are not execution timeouts.
-
-### Schema discovery
-
-`graph.get_schema` returns stable JSON text; `graph.get_structured_schema` returns
-a defensive copy. Both lazily cache inspection; call `graph.refresh_schema()`
-after external writes. Defaults inspect 100 canonical nodes and 100 edges, plus
-up to two endpoint nodes per edge. This bypasses stale secondary indexes.
-
-For different bounds, wrap the database with
-`GestaltDBGraph(db, schema_node_limit=20, schema_edge_limit=20)`. Set a limit to
-`None` only to explicitly allow exhaustive inspection, or supply a trusted
-`schema_override` dictionary to avoid scans entirely. Sampling follows backend
-key order, is not representative, and is not a coherent concurrent snapshot.
-The schema includes truncation, property types, endpoint labels, index definitions,
-and GestaltDB dialect guidance. It does not enforce a closed-world schema.
-
-### Graph-document ingestion
-
-```python
-from langchain_core.documents import Document
-from langchain_gestaltdb import GraphDocument, GraphNode, GraphRelationship
-
-alice = GraphNode(id="alice", type="Person", properties={"name": "Alice"})
-bob = GraphNode(id="bob", type="Person", properties={"name": "Bob"})
-document = GraphDocument(
-    nodes=[alice, bob],
-    relationships=[GraphRelationship(source=alice, target=bob, type="KNOWS")],
-    source=Document(page_content="Alice knows Bob", metadata={"path": "example.txt"}),
-)
-# Inside the graph context above:
-# graph.add_graph_documents([document], include_source=True)
-```
-
-Equivalent mappings/Pydantic graph models can be passed without installing
-Community or Neo4j. This is structural compatibility, not a promise to inherit
-their graph-store classes. Node labels union and incoming properties shallow-merge
-over existing properties. Ordinary string IDs are unchanged; integer IDs use
-`__lc_int__:<integer>`, and strings starting `__lc_` are escaped to a hashed
-`__lc_str__:` key, preventing integer/string/internal-source collisions.
-
-Default relationship identity hashes endpoints, type, and normalized properties:
-exact repeats collapse; distinct properties produce parallel edges. Supply
-`GraphRelationship.id` to update properties of a particular edge or preserve
-otherwise identical parallel edges. Explicit IDs cannot change endpoints/type.
-Relationship `properties['type']` must agree with the declared type if supplied.
-
-With `include_source=True`, each source becomes a `__LangChainSource__` node
-with content/metadata and outgoing `MENTIONS` links. `Document.id` controls source
-identity when supplied; otherwise content plus metadata is hashed. Sources are
-not epistemic claims. Input is prevalidated, but writes are incremental and
-**not whole-import atomic**: backend failures can leave partial data. The schema
-cache is invalidated. JSON-safe property conversion follows query normalization.
-
-### Agent toolkit
+## Agent toolkit
 
 ```python
 from langchain_gestaltdb import GestaltDBToolkit
 
-# Use inside a GestaltDBGraph context; toolkit/tools borrow the wrapper.
-# schema_tool, query_tool = GestaltDBToolkit(graph=graph).get_tools()
-# schema_tool.invoke({"refresh": True})
-# query_tool.invoke({"query": "MATCH (n:Person) RETURN n.name AS name", "params": {}})
+# Inside a GestaltDBGraph context; tools borrow the wrapper.
+schema_tool, query_tool = GestaltDBToolkit(graph=graph).get_tools()
+schema_tool.invoke({"refresh": True})
+query_tool.invoke({"query": "MATCH (n:Person) RETURN n.name AS name", "params": {}})
 ```
 
-Tools implement LangChain `BaseTool` and accept tool-call messages. Query output
-is JSON with `records`, `returned_rows`, and `truncated`. Defaults cap output at
-100 rows/16000 characters; application configuration can lower those values.
-An oversized row is omitted whole, preserving valid JSON. Oversized schema
-returns an actionable error rather than silently dropping schema fields.
+Tools are read-only by default with bounded output (100 rows / 16000 chars
+unless the application lowers them). Agents cannot enable writes, enlarge
+limits, or allowlist procedures; applications opt in explicitly
+(`allow_writes=True`, `allowed_procedures=...`). Read-only prevents writes,
+not expensive reads: isolate hostile workloads at the process level.
 
-Only `query` and `params` are query inputs. Agents cannot enable writes, enlarge
-limits, choose procedure permissions, or replace the graph via tool arguments.
-Applications can explicitly construct `GestaltDBToolkit(graph=graph, allow_writes=True)`;
-that grants write capability and propagates upstream limitations (including TD-02).
-Known read procedures may be explicitly enabled with `allowed_procedures`.
-Tool-facing backend errors are redacted; low-level graph errors still propagate.
-Treat graph/source text as untrusted data, not instructions. Read-only prevents
-writes but does not bound execution cost, intermediate memory, or result collection.
-LangChain's async tool adapter offloads synchronous work; no native async is claimed.
+Related surfaces: `GestaltDBRetriever` (bounded seeded retrieval with
+`MENTIONS` source links), `GestaltDBSamplingTool` (raw multi-hop typed
+paths/subgraphs), `GestaltDBClaimToolkit` (four-valued claim status, search,
+and provenance explanations over bitemporal claims — claims are sourced
+assertions, not Cypher-visible edges), `GestaltDBClaimToolkit(allow_writes=True)`
+(opt-in assert/correct/retract), `GestaltDBTemporalToolkit` (as-of reads with
+pinned `read_view` horizons), `GestaltDBRuleToolkit` (Horn-rule read tools;
+create/run/maintain are opt-in), `GestaltDBModalToolkit` (bounded entailment;
+accessibility writes are opt-in), `GestaltDBVizTool` / `render_artifact`
+(offline HTML/SVG summaries with node/edge caps), `advise_index` (read-only
+index advice; agents never run DDL), and trusted-app bulk ingestion
+(`ingest_polars` / `ingest_arrow`, chunked, no whole-import atomicity).
 
-### Bounded graph retrieval
+## Examples
 
-```python
-from langchain_gestaltdb import GestaltDBRetriever, RetrievalHop
+No model, API key, database server, or network service is required:
 
-retriever = GestaltDBRetriever(
-    graph=graph,  # must stay open for the retriever's lifetime
-    seed_label="Person",  # indexed entity resolution
-    seed_property="name",  # requires create_node_property_index("name")
-    hops=(RetrievalHop(edge_type="WORKS_FOR", direction="out", sample_size=5),),
-)
-# documents = retriever.invoke("Alice")
+```bash
+uv run --locked python examples/graph_agent.py      # ingest -> schema -> tool call
+uv run --locked python examples/claim_agent.py      # claim status / explanation
+uv run --locked python examples/agent_workflow.py   # schema -> query/retrieve -> explain
+uv run --locked python examples/claim_writes.py     # opt-in claim writes
 ```
-
-`GestaltDBRetriever` is a `BaseRetriever`, not a vector store. Configure exactly
-one seed strategy: `seed_ids` (explicit), `seed_resolver` (a callable such as an
-external vector-store lookup returning node IDs), or the indexed
-`seed_label`/`seed_property` pair. Indexed resolution matches the query string
-exactly against the indexed property value, so create that property index first;
-non-string properties and fuzzy matching need a resolver or explicit seeds.
-Absent seeds are skipped rather than fabricated, and an empty graph yields `[]`.
-
-Each returned `Document` preserves the entity `id`/labels/properties, the
-normalized traversal `paths` (with `edge_id`, `source_id`, `target_id`,
-`edge_type`, `direction`), distinct `relationship_types`, `hops`, and `sources`
-(`document_id` plus metadata) linked through `MENTIONS` when
-`include_sources=True`. Labels often carry the evidence text. Byte IDs are
-decoded to strings and all metadata stays JSON-safe.
-
-Traversal is bounded: at most 8 `hops`, `sample_size` of 1–100 per hop,
-`max_paths`, `max_entities`, and `max_content_chars`. `max_seeds` bounds
-resolution. `result_truncated` is a run-level flag for seed/path/entity caps,
-copied onto every returned document. `content_truncated` and `sources_truncated`
-describe per-document clipping; `truncated` is true if any of these flags is true.
-Sampling intentionally selects a subset and does not set these flags. Output ordering is deterministic (seeds first, then
-sorted IDs) but is **not** a relevance ranking, and no database ordering is
-promised. The retriever only reads; it never writes or rebuilds indexes. Typed
-adjacency remains usable during deferred edge ingestion; indexed seeding rejects
-stale node-label/property indexes until explicitly rebuilt. External vector
-search may supply seeds without making this package a vector store.
-
-Caps bound returned entities and content, not database work or total metadata
-size. Resolvers, property normalization, and source lookup may still be costly.
-
-### Claim status and provenance tools
-
-GestaltDB claims are sourced assertions or denials in a bitemporal epistemic
-layer. They are **not** graph edges: they do not create current-state edges and
-never appear in Cypher results or `MATCH` patterns. `GestaltDBClaimToolkit`
-exposes read-only, bounded tools for them; writes require explicit opt-in (below).
-
-```python
-from langchain_gestaltdb import GestaltDBClaimToolkit
-
-# Use inside a GestaltDBGraph context; tools borrow the wrapper.
-# status, search, explain = GestaltDBClaimToolkit(graph=graph).get_tools()
-# status.invoke({"subject": "alice", "predicate": "WORKS_FOR", "object": "acme",
-#                "world": "reported", "valid_time": "2024-06-01T00:00:00Z"})
-# explain.invoke({"claim_id": "claim:...", "valid_time": "2024-06-01T00:00:00Z"})
-```
-
-`gestaltdb_claim_status` reports a distinct `supported`, `refuted`, `both` or
-`unknown` status with bounded supporting/refuting evidence under open-world
-semantics. `gestaltdb_claim_search` lists claims by statement, subject,
-predicate, object, agent, source, world or polarity. `gestaltdb_claim_explanation`
-returns a bounded claim/rule derivation graph. Agent/source/world and polarity
-filters plus valid time and system time (or `through_commit`) are supported.
-Explanations preserve historical version/logical ids and explicit truncation
-metadata. Only filters and times are agent inputs: the graph, caps
-(`max_evidence`, `max_claims`, `max_depth`, `max_nodes`, `max_edges`,
-`max_chars`) are application-controlled. Output caps bound returned
-JSON, not execution time or memory.
-
-Status and evidence use one claim resolution; the status is computed before
-evidence truncation. Read-tool `max_chars` includes the complete response envelope.
-If metadata alone cannot fit, the read tool returns a bounded JSON `error` with
-`truncated: true` instead of silently clipping identities or times.
-Search treats omitted or null `object` as any object; null-literal filtering is
-not exposed by search (use status for a specific null-literal statement).
-Omitting every indexed filter scans the full claim catalog.
-
-### Opt-in claim writes
-
-Writing claims is explicitly opt-in. `GestaltDBClaimToolkit(graph=graph,
-allow_writes=True)` additionally returns append-only `gestaltdb_claim_assert`,
-`gestaltdb_claim_correct` and `gestaltdb_claim_retract` tools; the default
-toolkit never exposes them. Direct construction of a write tool also opts in.
-Assertions require explicit agent, polarity, JSON provenance (`{}` if unavailable),
-and fact-validity start. Corrections and retractions require an exact
-`supersedes_version_id`; optional validity overrides use timezone-aware ISO-8601
-instants with an exclusive end after the start. Agent authority and confidence
-are never inferred. These tools grant write capability, not agent authentication
-or per-claim authorization: trusted applications must enforce those policies.
-Nothing is deleted. Fact validity (`valid`) stays separate from system knowledge
-time (`system_time`); prior versions remain retrievable with historical horizons.
-
-```python
-# write, correct and retract tools (opt-in):
-# status, search, explain, assert_tool, correct_tool, retract_tool = \
-#     GestaltDBClaimToolkit(graph=graph, allow_writes=True).get_tools()
-# assert_tool.invoke({"subject": "alice", "predicate": "WORKS_FOR", "object": "acme",
-#                     "polarity": "positive", "agent": "source:hr",
-#                     "provenance": {"document": "hr.csv"},
-#                     "valid_from": "2024-01-01T00:00:00Z"})
-# correct_tool.invoke({"claim_id": "claim:...", "supersedes_version_id": "uuid",
-#                      "confidence": 0.9})
-# retract_tool.invoke({"claim_id": "claim:...", "supersedes_version_id": "uuid",
-#                      "reason": "employment ended", "valid_from": "2024-05-01T00:00:00Z"})
-```
-
-Successful writes return JSON with `written: true` and the new version. If the
-full payload cannot fit `max_chars` (or cannot be serialized), the response is a
-compact success receipt containing `version_id`, `logical_id`, and
-`truncated: true`, not a failure. Do not retry a committed write merely because
-its payload was omitted. Backend errors are redacted and may have uncertain
-outcomes; reconcile stored state before retrying. Backend transaction guarantees
-are unchanged, and an exact version target is not a latest-version compare-and-swap.
 
 ## Development
-
-Run the complete offline ingest → schema → tool-call → source-evidence example:
-
-```bash
-uv run --locked python examples/graph_agent.py
-```
-
-Run the offline claim status/contradiction/provenance example:
-
-```bash
-uv run --locked python examples/claim_agent.py
-```
-
-Run the offline opt-in claim-write example (fact validity vs system knowledge time):
-
-```bash
-uv run --locked python examples/claim_writes.py
-```
-
-No model, API key, database server, or network service is required. The scripted
-tool call demonstrates the same `ToolMessage` dispatch used by LangChain agents;
-it is not an LLM reasoning benchmark. See [the API contract](docs/API.md).
 
 Use Python 3.10–3.13 (3.12 recommended) and [uv](https://docs.astral.sh/uv/):
 
@@ -276,41 +90,20 @@ uv build --no-sources
 uv run --locked twine check dist/*
 ```
 
-The committed lockfile makes development reproducible; the dependency ranges
-in `pyproject.toml` describe the library's consumer contract. CI also exercises
-minimum/latest direct dependencies, real deferred-index behavior, and additional
-LevelDB/PyRex backend contracts on Linux/Python 3.12. All tests run offline and
-enforce at least 90% package coverage in the Python matrix.
-
-The integration installs `gestaltdb[rocksdb]` by default, bringing in
-`pyrex-rocksdb`. The upstream GestaltDB base package alone still has no backend.
-`lmdb` and `leveldb` remain optional extras and require an explicit `backend=`
-override; the existing `rocksdb` extra remains compatible. Development also
-installs `lmdb` to retain explicit LMDB snapshot/compatibility tests. Default
-examples and backend contracts exercise PyRex with JSON; no silent fallback is
-attempted. Reopening a database uses its persisted backend, so this creation
-default does not migrate or reinterpret existing LMDB/LevelDB stores.
-
-## Agent-oriented upstream documentation
+The committed lockfile makes development reproducible; the ranges in
+`pyproject.toml` describe the consumer contract. All tests run offline and
+enforce at least 90% package coverage in the Python matrix. Upstream behavior
+is defined by the installed `gestaltdb` release:
 
 ```bash
 uv run --locked python -m gestaltdb.agent_docs list
-uv run --locked python -m gestaltdb.agent_docs get quickstart
 uv run --locked python -m gestaltdb.agent_docs get cypher --examples
-uv run --locked python -m gestaltdb.agent_docs search sample_typed_subgraph
 ```
 
 ## Contributing and releases
 
 Read [AGENTS.md](AGENTS.md) for branch, PR, CI, and release policy. Work goes
-through issue-scoped branches and PRs; `main` is protected. Releases use explicit
-maintainer approval and PyPI Trusted Publishing via `publish.yml`; merging alone
-never publishes. See [release notes](CHANGELOG.md) and the
+through issue-scoped branches and PRs; `main` is protected. Releases use
+explicit maintainer approval and PyPI Trusted Publishing via `publish.yml`;
+merging alone never publishes. See [release notes](CHANGELOG.md) and the
 [release runbook](docs/RELEASING.md). This repository retains its Apache-2.0 license.
-
-## Scaffold provenance
-
-The bootstrap was informed by the `langchain-cli==0.0.37` integration template,
-generated selectively with Python 3.12 into a disposable staging directory.
-The old Poetry/Core 0.3 configuration was replaced with PEP 621, uv, Hatchling,
-and Core 1.x. No provider stubs or template license were copied into this project.

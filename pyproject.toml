@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "langchain-gestaltdb"
-version = "0.1.1"
+version = "0.2.0"
 description = "A graph-first LangChain integration for GestaltDB"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = [
-    "gestaltdb[rocksdb]>=0.12.0,<0.13",
+    "gestaltdb[rocksdb]>=0.17.0,<0.18",
     "langchain-core>=1.0,<2",
     "pydantic>=2.7,<3",
 ]
@@ -21,9 +21,9 @@ Repository = "https://github.com/mylonasc/langchain-gestaltdb"
 Issues = "https://github.com/mylonasc/langchain-gestaltdb/issues"
 
 [project.optional-dependencies]
-lmdb = ["gestaltdb[lmdb]>=0.12.0,<0.13"]
-leveldb = ["gestaltdb[leveldb]>=0.12.0,<0.13"]
-rocksdb = ["gestaltdb[rocksdb]>=0.12.0,<0.13"]
+lmdb = ["gestaltdb[lmdb]>=0.17.0,<0.18"]
+leveldb = ["gestaltdb[leveldb]>=0.17.0,<0.18"]
+rocksdb = ["gestaltdb[rocksdb]>=0.17.0,<0.18"]
 
 [dependency-groups]
 dev = [
@@ -71,5 +71,14 @@ ignore_missing_imports = true
 # TD-01: NumPy's current stubs use 3.12 syntax; this package targets 3.10 and
 # does not expose NumPy types. Do not weaken checks for our own modules.
 module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
+[[tool.mypy.overrides]]
+# Optional bulk-ingestion dependencies are imported lazily behind an install
+# hint and are not part of the runtime contract. Treat them as opaque when
+# present instead of pinning third-party stub versions.
+module = ["polars", "polars.*", "pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
 follow_imports = "skip"
 follow_imports_for_stubs = true

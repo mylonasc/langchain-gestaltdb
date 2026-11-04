@@ -16,6 +16,7 @@ from langchain_gestaltdb import (
     GestaltDBQueryTool,
     GestaltDBSchemaTool,
 )
+from langchain_gestaltdb._compat import call_upstream
 
 
 class TestQueryToolStandard(ToolsUnitTests):
@@ -106,7 +107,9 @@ class TestClaimCorrectToolStandard(TestQueryToolStandard):
     def graph_fixture(self, tmp_path: Path) -> Iterator[None]:
         with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
             self.graph = graph
-            self.claim = graph.graph.assert_claim(
+            self.claim = call_upstream(
+                graph.graph,
+                "assert_claim",
                 subject="alice",
                 predicate="WORKS_FOR",
                 object="acme",
@@ -134,7 +137,9 @@ class TestClaimRetractToolStandard(TestQueryToolStandard):
     def graph_fixture(self, tmp_path: Path) -> Iterator[None]:
         with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
             self.graph = graph
-            self.claim = graph.graph.assert_claim(
+            self.claim = call_upstream(
+                graph.graph,
+                "assert_claim",
                 subject="alice",
                 predicate="WORKS_FOR",
                 object="acme",
