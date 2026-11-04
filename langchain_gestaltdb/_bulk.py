@@ -111,7 +111,7 @@ def validate_polars_frames(
     pitfall: bare strings would be shredded into per-character labels).
     """
     try:
-        import polars as pl  # type: ignore[import-not-found]
+        import polars as pl
     except ImportError as exc:
         raise ImportError(
             "Bulk Polars ingestion needs the optional 'polars' dependency; "

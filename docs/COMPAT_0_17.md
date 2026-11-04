@@ -10,25 +10,63 @@ Pinned: `gestaltdb>=0.12.0,<0.13` (0.12.0 installed). Target: `0.17.x`.
 
 ## Bridge
 
-`langchain_gestaltdb/_compat.py:call_upstream(graph, name, ...)`:
+`langchain_gestaltdb/_compat.py`:
 
-- Prefers facade when present (0.12), else service (0.17+).
-- Maps renames: `explain_claim→rules.explain`, `run_rules→rules.run`, `maintain_truth→rules.maintain`, `read_view→temporal.open_read_view`.
+- `call_upstream(graph, name, ...)` prefers the facade when present (0.12),
+  else the owning service (0.17+). Renames: `explain_claim→rules.explain`,
+  `run_rules→rules.run`, `maintain_truth→rules.maintain`.
+- `open_read_view(graph, *, valid_time, system_time=None, through_commit=None)`
+  bridges `GraphDB.read_view` (0.12) and
+  `temporal.open_read_view(graph, manifest=..., database_id=..., ...)` (0.17).
+  `GestaltDBGraph.read_view(...)` exposes the same helper to adapter users.
+- `evaluate_entailment(graph, ...)` calls `GraphDB.entails` on 0.12; on 0.17 it
+  opens one pinned `GraphReadView` and calls
+  `epistemic.entails(view, agent, proposition, mode, world=..., ...)`, because
+  the 0.17 service takes a view instead of `valid_time`/`system_time`.
 - `service_layout()` returns `facade`/`services` for diagnostics.
 
-Wired in G17-01: `claims.py` (status/search/explanation), `claim_writes.py` (assert/correct/retract).
+Wired across the integration: `claims.py`, `claim_writes.py`,
+`temporal_tools.py`, `rules.py`, `modal.py` and `_bulk.py` route through the
+bridge (or through shared helpers that do).
+
+## Integration coverage (G17-02 … G17-12)
+
+All twelve slices are merged on `integration/gestalt-agent-backend` and were
+smoke-tested against `gestaltdb==0.17.0`:
+
+- Lifecycle inspection: `manifest`, `database_id`, `index_statistics()`,
+  `stale_indexes()`, `read_snapshot`, and `adapter.read_view(...)`.
+- Cypher: `SHOW INDEX[ES]`, `SHOW CONSTRAINTS`, `kg.entails` with
+  `world`+`validTime`, `FOR VALID_TIME` / `FOR SYSTEM_TIME`, version functions,
+  and write-restricted temporal queries.
+- Schema metadata + read-only index advisor; trusted-app `ingest_polars` /
+  `ingest_arrow`; bounded sampling; temporal as-of/scan tools; rule
+  get/list/create/run/maintain; modal entails + accessibility writes; offline
+  visualization artifacts.
+- Claim assert/status/search/explain, deferred-index fail-closed behavior, and
+  the 0.12 suite all still pass.
+
 Verified:
-- `pytest` 210 passed on 0.12.0.
-- Isolated 0.17.0 smoke: `assert_claim` → `iter_claims_as_of` → `explain` round-trip OK via bridge.
 
-## Remaining for later G17s
+- `pytest` 309 passed / 5 skipped on 0.12.0 (the 5 skips are optional
+  `polars`/`pyarrow` tests; the isolated bulk smoke covers them when installed).
+- Isolated 0.17.0 smoke: claim round-trip, temporal reads, `SHOW INDEXES` /
+  `SHOW CONSTRAINTS`, `kg.entails`, `pg.sample_typed_paths`, rules,
+  accessibility writes, sampling, index advice, viz, and Arrow/Polars bulk
+  ingestion all succeed through the adapter.
 
-- Temporal facades (`get_*_as_of`, `iter_*_as_of`, `read_view`) still facade-only in code; bridge mapping exists but no tools yet (G17-08, G17-04).
-- Rules/modal (`create_rule/run/maintain/entails`) mapping exists, no tools yet (G17-09, G17-10).
-- `pyproject` pin unchanged in G17-01; version bump is G17-12 after full matrix passes.
-- TD-01 (typing): 0.17 ships more typing; revisit override after bump. TD-02 (bulk JSON): 0.12.1 fixed #109; re-benchmark on 0.17 before enabling fast path (G17-06). TD-03 (AST coupling): `cypher_ast` names stable 0.12→0.17; still version-coupled, needs upstream classifier watch.
+## Remaining follow-up
 
-## Upgrade policy (pinned minor, G17-16)
+- `pyproject` still pins `gestaltdb>=0.12.0,<0.13`; the version bump is a
+  dedicated, separately verified upgrade PR, not part of G17-12. See the
+  upgrade policy below.
+- TD-01 (typing): 0.17 ships more typing; revisit overrides after the bump.
+- TD-02 (bulk JSON): 0.12.1 fixed #109; re-benchmark on 0.17 before enabling a
+  fast path.
+- TD-03 (AST coupling): `cypher_ast` names are stable 0.12→0.17 but remain
+  version-coupled; keep watching the upstream classifier.
+
+## Upgrade policy (pinned minor)
 
 - The `gestaltdb` minor stays pinned (`>=0.12.0,<0.13` in `pyproject.toml`)
   until a dedicated, verified upgrade PR moves it. No silent fallback and no

@@ -18,6 +18,13 @@ Every bounded surface in this package caps the **returned output**:
 | `GestaltDBRetriever` | `max_seeds`, `max_paths`, `max_entities`, `max_content_chars`, `max_sources_per_entity` | `result_truncated` (run-level), `content_truncated` / `sources_truncated` (per-document), `truncated` (union); sampling is intentional selection, not truncation |
 | Claim read tools | `max_evidence`, `max_claims`, `max_depth`, `max_nodes`, `max_edges`, `max_chars` | `truncated: true` flags; status is computed before evidence truncation; metadata that cannot fit yields a bounded JSON `error`, never clipped identities |
 | Claim write tools | `max_chars` | success receipt with `version_id`/`logical_id` and `truncated: true` when the payload cannot fit; the commit already happened (see below) |
+| `GestaltDBSamplingTool` | `max_paths`, `max_nodes`, `max_edges`, `max_chars` | `returned_paths` / `returned_nodes` / `returned_edges` plus one shared `truncated` flag; sampling is intentional selection, not truncation |
+| Temporal as-of tools | `max_entities`, `max_chars` | bounded version/scan lists with `truncated`; one entity per call for `*_as_of` |
+| Rule tools | `max_rules`, `max_versions`, `max_iterations`, `max_derivations`, `max_justifications`, `max_chars` | bounded rule/version lists; limit errors fail closed with no partial conclusions; unchanged repeat runs are idempotent |
+| Modal entailment | `max_depth`, `max_states`, `max_chars` | bounded `explanation`; bound exhaustion fails closed with a redacted error, never a partial verdict |
+| Visualization (`GestaltDBVizTool` / `render_artifact`) | `max_nodes` (default 2000), `max_edges` (default 5000), `max_chars` | summary JSON only (`path`, counts, truncation, banner); caps truncate deterministically with a warning, and payloads beyond 2x caps raise an error instead of freezing the viewer |
+| Index advisor | `max_chars` | one bounded advice record; read-only, never runs DDL |
+| Bulk ingestion (`ingest_polars` / `ingest_arrow`) | `chunk_size`, `index_mode` | trusted-app only; returns counts and stale-index families, no whole-import atomicity and no agent output cap |
 
 Caps never bound **execution time, intermediate memory, or database-side
 result materialization**. A query that matches millions of rows still matches
@@ -88,14 +95,13 @@ the adapter never strengthens them. `read_snapshot` on `query` /
 | Default (non-transactional) PyRex | best-effort reads | rejected with `NotImplementedError` | best-effort reads |
 | LevelDB | best-effort reads | rejected with `NotImplementedError` | best-effort reads |
 
-To pin several reads to one visible state, share one horizon explicitly via
-the underlying handle (`adapter.graph`, which fails closed once the adapter
-is closed): `read_view(...)` pins a temporal commit horizon, while
-`current_read_view()` pins mutable entities, adjacency, and indexes to one
-backend snapshot where supported. Both are context managers on the raw
-handle, must be closed via the `with` block, and inherit the backend limits
-above. Lookup and traversal order is never guaranteed; compare ID sets, and
-decode typed traversal byte IDs with `graph.key_to_string(...)` before
+To pin several reads to one visible state, share one horizon explicitly:
+`adapter.read_view(...)` pins a temporal commit horizon on both 0.12 and 0.17
+layouts, while `adapter.graph.current_read_view()` pins mutable entities,
+adjacency, and indexes to one backend snapshot where supported. Both are
+context managers, must be closed via the `with` block, and inherit the backend
+limits above. Lookup and traversal order is never guaranteed; compare ID sets,
+and decode typed traversal byte IDs with `graph.key_to_string(...)` before
 comparing with string IDs. There is no whole-graph enumeration API.
 
 Backend selection is explicit and manifest-pinned: `create` defaults to

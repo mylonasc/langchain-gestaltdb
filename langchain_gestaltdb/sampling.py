@@ -193,11 +193,15 @@ class GestaltDBSamplingTool(BaseTool):
             record = edge.to_dict()
             properties = normalize(record.get("properties") or {})
             edge_type = properties.get("type")
-            if hasattr(edge, "get_type"):
+            get_type = getattr(edge, "get_type", None)
+            if callable(get_type):
                 try:
-                    edge_type = edge.get_type()
+                    edge_type = get_type()
                 except Exception:
                     pass
+            elif isinstance(get_type, str):
+                # 0.17 exposes ``Edge.get_type`` as a property, not a method.
+                edge_type = get_type
             edges.append(
                 {
                     "id": db.key_to_string(key),

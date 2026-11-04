@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Collection, Iterable
+from contextlib import AbstractContextManager
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 
 from gestaltdb.graphdb import GraphDB
 
-from langchain_gestaltdb import _bulk
+from langchain_gestaltdb import _bulk, _compat
 from langchain_gestaltdb._ingestion import ingest
 from langchain_gestaltdb._read_only import validate_read_only
 from langchain_gestaltdb._schema import discover_schema
@@ -30,7 +31,7 @@ class GestaltDBGraph:
     once this adapter is closed. No raw write transaction is exposed to agents:
     writes go through validated ingestion, claim tools, or explicit trusted use
     of ``graph``. To pin several reads to one visible state, use
-    ``adapter.graph.read_view(...)`` (temporal horizon) or
+    ``adapter.read_view(...)`` (temporal horizon) or
     ``adapter.graph.current_read_view()`` (backend snapshot); both are backend
     dependent (see :meth:`query`).
     """
@@ -157,22 +158,47 @@ class GestaltDBGraph:
         To pin several reads to one visible state, do not rely on repeated
         ``read_snapshot`` queries. Instead share one horizon explicitly::
 
-            with adapter.graph.read_view(valid_time=...) as view:
+            with adapter.read_view(valid_time=...) as view:
                 ...
             with adapter.graph.current_read_view() as view:
                 ...
 
-        ``read_view`` pins a temporal commit horizon; ``current_read_view``
-        pins mutable entities, adjacency, and indexes to one backend snapshot
-        where supported. Both are context managers on the underlying handle
-        (access via ``adapter.graph``, which fails closed), must be closed via
-        the ``with`` block, and inherit the backend limits above. Lookup and
-        traversal order is never guaranteed; compare ID sets, and decode typed
-        traversal byte IDs with ``graph.key_to_string(...)`` before comparing
-        with string IDs. There is no whole-graph enumeration API.
+        ``read_view`` pins a temporal commit horizon on either supported
+        GestaltDB layout (0.12 facade or 0.17 ``temporal.open_read_view``);
+        ``current_read_view`` pins mutable entities, adjacency, and indexes to
+        one backend snapshot where supported. Both are context managers, must
+        be closed via the ``with`` block, and inherit the backend limits above.
+        Lookup and traversal order is never guaranteed; compare ID sets, and
+        decode typed traversal byte IDs with ``graph.key_to_string(...)``
+        before comparing with string IDs. There is no whole-graph enumeration
+        API.
         """
         result = self.graph.query(query, parameters=params, read_snapshot=read_snapshot)
         return [normalize(record) for record in result.records]
+
+    def read_view(
+        self,
+        *,
+        valid_time: Any,
+        system_time: Any = None,
+        through_commit: int | None = None,
+    ) -> AbstractContextManager[Any]:
+        """Pin repeated reads to one temporal horizon across supported layouts.
+
+        Yields a ``GraphReadView`` exposing point-in-time entity reads
+        (``get_node_as_of``/``get_edge_as_of``/iteration) at ``valid_time`` and
+        an optional system horizon (``system_time`` or ``through_commit``).
+        On 0.12 this is ``GraphDB.read_view``; on 0.17 it is
+        ``temporal.open_read_view`` authenticated with this database's
+        manifest and ID. The view must be used as a context manager; it is
+        backend dependent and adds no snapshot guarantee beyond upstream.
+        """
+        return _compat.open_read_view(
+            self.graph,
+            valid_time=valid_time,
+            system_time=system_time,
+            through_commit=through_commit,
+        )
 
     def close(self) -> None:
         """Idempotently close the adapter and, only when owned, its database."""
