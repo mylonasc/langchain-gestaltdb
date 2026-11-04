@@ -4,7 +4,7 @@ Canonical deployment limits for `langchain-gestaltdb`. Tool, toolkit, and
 adapter documentation links here instead of repeating the full text; the
 one-line fail-closed warnings next to each tool stay in place. Upstream
 behavior is defined by the installed `gestaltdb` release (pinned
-`gestaltdb>=0.12.0,<0.13`; see `docs/COMPAT_0_17.md`); this page states what
+`gestaltdb>=0.17.0,<0.18`; see `docs/COMPAT_0_17.md`); this page states what
 this integration does and does not promise on top of it.
 
 ## Output caps bound returned bytes, not work
@@ -96,8 +96,8 @@ the adapter never strengthens them. `read_snapshot` on `query` /
 | LevelDB | best-effort reads | rejected with `NotImplementedError` | best-effort reads |
 
 To pin several reads to one visible state, share one horizon explicitly:
-`adapter.read_view(...)` pins a temporal commit horizon on both 0.12 and 0.17
-layouts, while `adapter.graph.current_read_view()` pins mutable entities,
+`adapter.read_view(...)` pins a temporal commit horizon on both facade and
+services layouts, while `adapter.graph.current_read_view()` pins mutable entities,
 adjacency, and indexes to one backend snapshot where supported. Both are
 context managers, must be closed via the `with` block, and inherit the backend
 limits above. Lookup and traversal order is never guaranteed; compare ID sets,
@@ -128,7 +128,7 @@ reopening never migrates or reinterprets existing LMDB/LevelDB stores.
 
 ## Version and release posture
 
-The `gestaltdb` minor is pinned (`>=0.12.0,<0.13`) and moves only through a
+The `gestaltdb` minor is pinned (`>=0.17.0,<0.18`) and moves only through a
 verified upgrade PR (probe matrix, TD-01/TD-02/TD-03 revisit, `agent_docs`
 diff, reviewed `uv.lock`); `uv.lock` is committed and a version-only change
 must not upgrade unrelated dependencies. Merging never authorizes

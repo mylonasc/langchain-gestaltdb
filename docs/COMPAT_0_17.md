@@ -1,6 +1,8 @@
 # GestaltDB 0.12 → 0.17 compatibility (G17-01 probe)
 
-Pinned: `gestaltdb>=0.12.0,<0.13` (0.12.0 installed). Target: `0.17.x`.
+Pinned: `gestaltdb>=0.17.0,<0.18` (0.17.0 installed) since `0.2.0`.
+Previously: `gestaltdb>=0.12.0,<0.13` (0.12.0 installed) through `0.1.1`.
+The compat bridge below keeps working on both upstream layouts.
 
 ## Layout change (breaking)
 
@@ -31,8 +33,9 @@ bridge (or through shared helpers that do).
 
 ## Integration coverage (G17-02 … G17-12)
 
-All twelve slices are merged on `integration/gestalt-agent-backend` and were
-smoke-tested against `gestaltdb==0.17.0`:
+All twelve slices ship in `0.2.0` on `main` (developed on
+`integration/gestalt-agent-backend`) and are tested against
+`gestaltdb==0.17.0`:
 
 - Lifecycle inspection: `manifest`, `database_id`, `index_statistics()`,
   `stale_indexes()`, `read_snapshot`, and `adapter.read_view(...)`.
@@ -44,23 +47,24 @@ smoke-tested against `gestaltdb==0.17.0`:
   get/list/create/run/maintain; modal entails + accessibility writes; offline
   visualization artifacts.
 - Claim assert/status/search/explain, deferred-index fail-closed behavior, and
-  the 0.12 suite all still pass.
+  the full 309-test suite all pass on the 0.17 line.
 
-Verified:
+Verified for `0.2.0`:
 
-- `pytest` 309 passed / 5 skipped on 0.12.0 (the 5 skips are optional
+- `pytest` 309 passed / 5 skipped on 0.17.0 (the 5 skips are optional
   `polars`/`pyarrow` tests; the isolated bulk smoke covers them when installed).
-- Isolated 0.17.0 smoke: claim round-trip, temporal reads, `SHOW INDEXES` /
-  `SHOW CONSTRAINTS`, `kg.entails`, `pg.sample_typed_paths`, rules,
-  accessibility writes, sampling, index advice, viz, and Arrow/Polars bulk
-  ingestion all succeed through the adapter.
+- `ruff check`, `ruff format --check`, and strict `mypy` pass on the 0.17 line
+  (upstream now ships partial typing; the boundary keeps narrow
+  `no-untyped-call` ignores, see TD-01).
+- Offline `agent_workflow`, `graph_agent`, `claim_agent`, and `claim_writes`
+  examples run on 0.17; wheel build, `twine check`, and release-artifact
+  verification pass.
 
 ## Remaining follow-up
 
-- `pyproject` still pins `gestaltdb>=0.12.0,<0.13`; the version bump is a
-  dedicated, separately verified upgrade PR, not part of G17-12. See the
-  upgrade policy below.
-- TD-01 (typing): 0.17 ships more typing; revisit overrides after the bump.
+- TD-01 (typing): 0.17 ships partial typing, adopted with narrow boundary
+  ignores plus fixes to real errors surfaced by the upgrade; remove the ignores
+  as upstream typing completes.
 - TD-02 (bulk JSON): 0.12.1 fixed #109; re-benchmark on 0.17 before enabling a
   fast path.
 - TD-03 (AST coupling): `cypher_ast` names are stable 0.12→0.17 but remain
@@ -68,7 +72,7 @@ Verified:
 
 ## Upgrade policy (pinned minor)
 
-- The `gestaltdb` minor stays pinned (`>=0.12.0,<0.13` in `pyproject.toml`)
+- The `gestaltdb` minor stays pinned (`>=0.17.0,<0.18` in `pyproject.toml`)
   until a dedicated, verified upgrade PR moves it. No silent fallback and no
   unpinned drift, so services-layout behavior (0.17+) can never leak in
   unnoticed.
@@ -96,11 +100,8 @@ maintainer authorization. The integration branch itself never publishes.
 ## How to probe locally
 
 ```bash
-# 0.12 suite (worktree)
-uv run --project <worktree> --locked pytest -q
-# 0.17 smoke (isolated, worktree on PYTHONPATH)
-PYTHONPATH=<worktree> uv run --isolated --python 3.12 \
-  --with 'gestaltdb[rocksdb]==0.17.0' \
-  --with 'langchain-core>=1.0,<2' --with 'pydantic>=2.7,<3' \
-  python -c "from langchain_gestaltdb._compat import service_layout; ..."
+# Full suite on the pinned 0.17 line
+uv run --locked pytest -q
+# Layout check through the bridge
+uv run --locked python -c "from langchain_gestaltdb._compat import service_layout; ..."
 ```

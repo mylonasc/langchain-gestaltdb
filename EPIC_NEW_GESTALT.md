@@ -18,16 +18,16 @@ uv run --locked python -m gestaltdb.agent_docs get temporal
 uv run --locked python -m gestaltdb.agent_docs search '<API name>'
 ```
 
-Reference: `gestaltdb==0.12.0` pinned in `pyproject.toml`; packaged guides above are the
+Reference: `gestaltdb==0.17.0` pinned in `pyproject.toml`
+(`>=0.17.0,<0.18`); packaged guides above are the
 source of truth for upstream behavior. `gestaltdb.graphdb.GraphDB/Node/Edge` are the only
 supported imports (see `AGENTS.md`).
 
-Status: the G17-01–G17-12 slices are implemented on
-`integration/gestalt-agent-backend` (compat bridge, lifecycle/Cypher/bitemporal reads,
-schema/index advice, bulk ingestion, sampling, temporal tools, rules, modal entailment,
-visualization, docs). They are smoke-tested against `gestaltdb==0.17.0` while the
-declared pin stays at `>=0.12.0,<0.13`; the version bump and merge to `main` remain
-separate, explicitly reviewed steps. See `docs/COMPAT_0_17.md`.
+Status: the G17-01–G17-12 slices ship in `0.2.0` on `main` (compat bridge,
+lifecycle/Cypher/bitemporal reads, schema/index advice, bulk ingestion,
+sampling, temporal tools, rules, modal entailment, visualization, docs),
+tested against `gestaltdb==0.17.0`. The `0.1.x` line stays on the 0.12 pin.
+See `docs/COMPAT_0_17.md`.
 
 ## 1. Outcome and scope
 

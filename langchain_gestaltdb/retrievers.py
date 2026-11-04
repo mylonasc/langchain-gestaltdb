@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import random
 from collections.abc import Callable, Iterable, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from gestaltdb.graphdb import GraphDB
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
@@ -30,6 +30,16 @@ MAX_FANOUT = 100
 
 SOURCE_LABEL = "__LangChainSource__"
 MENTIONS = "MENTIONS"
+
+
+def _key_to_string(db: GraphDB, key: Any) -> str:
+    """Decode a node/edge key; the upstream helper is untyped (TD-01)."""
+    return cast("str", db.key_to_string(key))  # type: ignore[no-untyped-call]
+
+
+def _node_key_to_bytes(db: GraphDB, key: Any) -> bytes:
+    """Encode a node key; the upstream helper is untyped (TD-01)."""
+    return cast("bytes", db.node_key_to_bytes(key))  # type: ignore[no-untyped-call]
 
 
 class RetrievalHop(BaseModel):
@@ -128,8 +138,9 @@ class GestaltDBRetriever(BaseRetriever):
         elif self.seed_resolver is not None:
             candidates = (str(value) for value in self.seed_resolver(query))
         else:
+            assert self.seed_label is not None and self.seed_property is not None
             candidates = (
-                db.key_to_string(key)
+                _key_to_string(db, key)
                 for key in db.iter_node_ids_by_label_property(
                     self.seed_label, self.seed_property, query
                 )
@@ -140,7 +151,7 @@ class GestaltDBRetriever(BaseRetriever):
             if candidate in seen:
                 continue
             seen.add(candidate)
-            if db.get_node(db.node_key_to_bytes(candidate)) is None:
+            if db.get_node(_node_key_to_bytes(db, candidate)) is None:
                 continue  # Never fabricate documents for absent entities.
             if len(seeds) >= self.max_seeds:
                 return seeds, True
@@ -167,11 +178,11 @@ class GestaltDBRetriever(BaseRetriever):
                     rng=rng,
                 )
                 for record in records:
-                    step = {
-                        "edge_id": db.key_to_string(record["edge_id"]),
-                        "source_id": db.key_to_string(record["source_id"]),
-                        "target_id": db.key_to_string(record["target_id"]),
-                        "neighbor_id": db.key_to_string(record["neighbor_id"]),
+                    step: dict[str, Any] = {
+                        "edge_id": _key_to_string(db, record["edge_id"]),
+                        "source_id": _key_to_string(db, record["source_id"]),
+                        "target_id": _key_to_string(db, record["target_id"]),
+                        "neighbor_id": _key_to_string(db, record["neighbor_id"]),
                         "edge_type": record["edge_type"],
                         "direction": record["direction"],
                     }
@@ -194,7 +205,7 @@ class GestaltDBRetriever(BaseRetriever):
         is_seed: bool,
         truncated: bool,
     ) -> Document:
-        node = db.get_node(db.node_key_to_bytes(entity_id))
+        node = db.get_node(_node_key_to_bytes(db, entity_id))
         labels = list(node.labels) if node is not None else []
         properties = normalize(node.properties) if node is not None else {}
         relationship_types = sorted({step["edge_type"] for path in paths for step in path["steps"]})
@@ -238,8 +249,8 @@ class GestaltDBRetriever(BaseRetriever):
             return [], False  # Explicitly disabled, not a partial source lookup.
         found: list[dict[str, Any]] = []
         for record in db.iter_typed_adjacency(entity_id, MENTIONS, direction="in"):
-            source_id = db.key_to_string(record["source_id"])
-            node = db.get_node(db.node_key_to_bytes(source_id))
+            source_id = _key_to_string(db, record["source_id"])
+            node = db.get_node(_node_key_to_bytes(db, source_id))
             if node is None or SOURCE_LABEL not in node.labels:
                 continue
             if len(found) >= self.max_sources_per_entity:

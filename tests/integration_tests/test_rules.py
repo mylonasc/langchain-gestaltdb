@@ -13,6 +13,7 @@ from langchain_gestaltdb import (
     GestaltDBRuleRunTool,
     GestaltDBRuleToolkit,
 )
+from langchain_gestaltdb._compat import call_upstream
 
 VALID_TIME = "2024-06-01T00:00:00Z"
 WHEN = [
@@ -25,7 +26,9 @@ THEN_ONE_HOP = {"subject": "?p", "predicate": "AFFILIATED_WITH", "object": "?c"}
 
 def _seed(graph: GestaltDBGraph, world: str = "reported") -> None:
     database = graph.graph
-    database.assert_claim(
+    call_upstream(
+        database,
+        "assert_claim",
         subject="alice",
         predicate="WORKS_FOR",
         object="acme",
@@ -34,7 +37,9 @@ def _seed(graph: GestaltDBGraph, world: str = "reported") -> None:
         world=world,
         valid_from="2024-01-01T00:00:00Z",
     )
-    database.assert_claim(
+    call_upstream(
+        database,
+        "assert_claim",
         subject="acme",
         predicate="MEMBER_OF",
         object="industry",
@@ -110,7 +115,9 @@ def test_maintain_retracts_only_after_last_support(tmp_path: Path) -> None:
                 "then": {"subject": "?p", "predicate": "AFFILIATED_WITH", "object": "?c"},
             }
         )
-        first = graph.graph.assert_claim(
+        first = call_upstream(
+            graph.graph,
+            "assert_claim",
             subject="alice",
             predicate="WORKS_FOR",
             object="acme",
@@ -119,7 +126,9 @@ def test_maintain_retracts_only_after_last_support(tmp_path: Path) -> None:
             world="reported",
             valid_from="2024-01-01T00:00:00Z",
         )
-        second = graph.graph.assert_claim(
+        second = call_upstream(
+            graph.graph,
+            "assert_claim",
             subject="alice",
             predicate="WORKS_FOR",
             object="acme",
@@ -133,7 +142,9 @@ def test_maintain_retracts_only_after_last_support(tmp_path: Path) -> None:
         assert run["justification_count"] == 2
         logical_id = run["versions"][0]["logical_id"]
 
-        graph.graph.retract_claim(
+        call_upstream(
+            graph.graph,
+            "retract_claim",
             first.logical_id,
             supersedes_version_id=first.version_id,
             valid_from="2024-01-01T00:00:00Z",
@@ -141,9 +152,14 @@ def test_maintain_retracts_only_after_last_support(tmp_path: Path) -> None:
         kept = json.loads(tools["gestaltdb_rule_maintain"].invoke({"as_of": VALID_TIME}))
         assert kept["retracted_count"] == 0
         assert kept["support_count"] == 1
-        assert graph.graph.get_claim_as_of(logical_id, valid_time=VALID_TIME) is not None
+        assert (
+            call_upstream(graph.graph, "get_claim_as_of", logical_id, valid_time=VALID_TIME)
+            is not None
+        )
 
-        graph.graph.retract_claim(
+        call_upstream(
+            graph.graph,
+            "retract_claim",
             second.logical_id,
             supersedes_version_id=second.version_id,
             valid_from="2024-01-01T00:00:00Z",
@@ -151,7 +167,9 @@ def test_maintain_retracts_only_after_last_support(tmp_path: Path) -> None:
         withdrawn = json.loads(tools["gestaltdb_rule_maintain"].invoke({"as_of": VALID_TIME}))
         assert withdrawn["retracted_count"] == 1
         assert withdrawn["support_count"] == 0
-        assert graph.graph.get_claim_as_of(logical_id, valid_time=VALID_TIME) is None
+        assert (
+            call_upstream(graph.graph, "get_claim_as_of", logical_id, valid_time=VALID_TIME) is None
+        )
 
 
 def test_bound_exhaustion_persists_no_partial_conclusions(tmp_path: Path) -> None:
@@ -166,10 +184,13 @@ def test_bound_exhaustion_persists_no_partial_conclusions(tmp_path: Path) -> Non
             {"rule_id": "employment-implies-affiliation", "when": WHEN, "then": THEN}
         )
         _seed(graph)
-        before = len(list(graph.graph.iter_claims_as_of(valid_time=VALID_TIME)))
+        before = len(list(call_upstream(graph.graph, "iter_claims_as_of", valid_time=VALID_TIME)))
         output = tools["gestaltdb_rule_run"].invoke({"as_of": VALID_TIME})
         assert "rule operation failed" in output
-        assert len(list(graph.graph.iter_claims_as_of(valid_time=VALID_TIME))) == before
+        assert (
+            len(list(call_upstream(graph.graph, "iter_claims_as_of", valid_time=VALID_TIME)))
+            == before
+        )
 
         # The failed run left nothing behind: a full-budget rerun derives cleanly.
         full = {
@@ -207,7 +228,7 @@ def test_rules_join_within_one_world(tmp_path: Path) -> None:
 def test_unsafe_rule_never_reaches_backend(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         tools = _write_tools(graph)
-        with patch.object(graph.graph, "create_rule") as create:
+        with patch.object(graph.graph.rules, "create_rule") as create:
             output = tools["gestaltdb_rule_create"].invoke(
                 {
                     "rule_id": "unsafe",
@@ -229,7 +250,7 @@ def test_unsafe_rule_never_reaches_backend(tmp_path: Path) -> None:
 def test_nonconstant_predicates_are_rejected(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         tools = _write_tools(graph)
-        with patch.object(graph.graph, "create_rule") as create:
+        with patch.object(graph.graph.rules, "create_rule") as create:
             output = tools["gestaltdb_rule_create"].invoke(
                 {
                     "rule_id": "meta",
@@ -299,27 +320,29 @@ def test_toolkit_opt_in_and_bounds_are_app_controlled(tmp_path: Path) -> None:
 def test_errors_are_redacted(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         tools = _write_tools(graph)
-        with patch.object(graph.graph, "create_rule", side_effect=RuntimeError("/secret/path")):
+        with patch.object(
+            graph.graph.rules, "create_rule", side_effect=RuntimeError("/secret/path")
+        ):
             created = tools["gestaltdb_rule_create"].invoke(
                 {"rule_id": "r", "when": WHEN[:1], "then": THEN_ONE_HOP}
             )
         assert "rule operation failed" in created
         assert "secret" not in created
-        with patch.object(graph.graph, "get_rule", side_effect=RuntimeError("/secret/path")):
+        with patch.object(graph.graph.rules, "get_rule", side_effect=RuntimeError("/secret/path")):
             fetched = GestaltDBRuleGetTool(graph=graph).invoke({"rule_id": "r"})
         assert "rule operation failed" in fetched
         assert "secret" not in fetched
         with patch.object(
-            graph.graph, "iter_rule_versions", side_effect=RuntimeError("/secret/path")
+            graph.graph.rules, "iter_rule_versions", side_effect=RuntimeError("/secret/path")
         ):
             listed = GestaltDBRuleListTool(graph=graph).invoke({})
         assert "rule operation failed" in listed
         assert "secret" not in listed
-        with patch.object(graph.graph, "run_rules", side_effect=RuntimeError("/secret/path")):
+        with patch.object(graph.graph.rules, "run", side_effect=RuntimeError("/secret/path")):
             ran = tools["gestaltdb_rule_run"].invoke({"as_of": VALID_TIME})
         assert "rule operation failed" in ran
         assert "secret" not in ran
-        with patch.object(graph.graph, "maintain_truth", side_effect=RuntimeError("/secret/path")):
+        with patch.object(graph.graph.rules, "maintain", side_effect=RuntimeError("/secret/path")):
             maintained = tools["gestaltdb_rule_maintain"].invoke({"as_of": VALID_TIME})
         assert "rule operation failed" in maintained
         assert "secret" not in maintained

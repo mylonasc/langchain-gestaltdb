@@ -269,7 +269,9 @@ def test_modal_errors_are_redacted(modal_graph: GestaltDBGraph) -> None:
         }
     )
     assert "modal entailment failed" in invalid
-    with patch.object(modal_graph.graph, "entails", side_effect=RuntimeError("/secret/path")):
+    with patch.object(
+        modal_graph.graph.epistemic, "entails", side_effect=RuntimeError("/secret/path")
+    ):
         output = tool.invoke(
             {
                 "agent": "hr",
@@ -284,7 +286,9 @@ def test_modal_errors_are_redacted(modal_graph: GestaltDBGraph) -> None:
 
     write = GestaltDBWorldAccessibilityTool(graph=modal_graph)
     with patch.object(
-        modal_graph.graph, "assert_world_accessibility", side_effect=RuntimeError("secret")
+        modal_graph.graph.epistemic,
+        "assert_world_accessibility",
+        side_effect=RuntimeError("secret"),
     ):
         failed = write.invoke(
             {

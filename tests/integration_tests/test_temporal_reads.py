@@ -17,6 +17,7 @@ from gestaltdb.graphdb import IndexMaintenanceMode, Node
 from gestaltdb.temporal import TemporalInstant, TemporalInterval
 
 from langchain_gestaltdb import GestaltDBGraph, ReadOnlyQueryError
+from langchain_gestaltdb._compat import call_upstream
 from langchain_gestaltdb._read_only import validate_read_only
 
 VALID_LITERAL = 'datetime("1970-01-01T00:00:01Z")'
@@ -28,7 +29,9 @@ QUALIFIED_NAME = f"MATCH (n:Person) FOR VALID_TIME AS OF {VALID_LITERAL} RETURN 
 def _seed_versioned(path: Path, *, defer: bool = False) -> GestaltDBGraph:
     adapter = GestaltDBGraph.create(path, backend="lmdb")
     mode = IndexMaintenanceMode.DEFER if defer else IndexMaintenanceMode.MAINTAIN
-    adapter.graph.put_node_version(
+    call_upstream(
+        adapter.graph,
+        "put_node_version",
         Node("alice", labels=["Person"], properties={"name": "Alice"}),
         valid=TemporalInterval(TemporalInstant(0)),
         index_mode=mode,
@@ -93,7 +96,7 @@ def test_deferred_temporal_index_fail_closed_then_rebuild(tmp_path: Path) -> Non
         assert "temporal" in adapter.graph.stale_indexes()
         with pytest.raises(RuntimeError, match="stale"):
             adapter.query_read_only(QUALIFIED_NAME)
-        adapter.graph.rebuild_temporal_indexes()
+        call_upstream(adapter.graph, "rebuild_temporal_indexes")
         assert adapter.graph.stale_indexes() == ()
         rows = adapter.query_read_only(QUALIFIED_NAME)
         assert rows == [{"name": "Alice"}]

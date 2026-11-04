@@ -15,6 +15,7 @@ from langchain_gestaltdb import (
     GestaltDBClaimToolkit,
     GestaltDBGraph,
 )
+from langchain_gestaltdb._compat import call_upstream
 
 VALID_TIME = "2024-06-01T00:00:00Z"
 
@@ -23,7 +24,9 @@ VALID_TIME = "2024-06-01T00:00:00Z"
 def claim_graph(tmp_path: Path) -> Iterator[tuple[GestaltDBGraph, object]]:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         database = graph.graph
-        database.assert_claim(
+        call_upstream(
+            database,
+            "assert_claim",
             subject="alice",
             predicate="WORKS_FOR",
             object="acme",
@@ -34,7 +37,9 @@ def claim_graph(tmp_path: Path) -> Iterator[tuple[GestaltDBGraph, object]]:
             world="reported",
             valid_from="2024-01-01T00:00:00Z",
         )
-        database.assert_claim(
+        call_upstream(
+            database,
+            "assert_claim",
             subject="alice",
             predicate="WORKS_FOR",
             object="acme",
@@ -45,7 +50,9 @@ def claim_graph(tmp_path: Path) -> Iterator[tuple[GestaltDBGraph, object]]:
             world="reported",
             valid_from="2024-01-01T00:00:00Z",
         )
-        database.assert_claim(
+        call_upstream(
+            database,
+            "assert_claim",
             subject="acme",
             predicate="MEMBER_OF",
             object="industry",
@@ -54,12 +61,14 @@ def claim_graph(tmp_path: Path) -> Iterator[tuple[GestaltDBGraph, object]]:
             world="reported",
             valid_from="2024-03-01T00:00:00Z",
         )
-        database.create_rule(
+        call_upstream(
+            database,
+            "create_rule",
             "employment-implies-affiliation",
             when=[("?p", "WORKS_FOR", "?c"), ("?c", "MEMBER_OF", "?g")],
             then=("?p", "AFFILIATED_WITH", "?g"),
         )
-        derived = database.run_rules(as_of=VALID_TIME).versions[0]
+        derived = call_upstream(database, "run_rules", as_of=VALID_TIME).versions[0]
         yield graph, derived
 
 
@@ -184,7 +193,9 @@ def test_search_filters_and_bounded_output(claim_graph) -> None:
 def test_bitemporal_horizons_and_historical_versions(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         database = graph.graph
-        first = database.assert_claim(
+        first = call_upstream(
+            database,
+            "assert_claim",
             subject="acme",
             predicate="MEMBER_OF",
             object="industry",
@@ -194,7 +205,9 @@ def test_bitemporal_horizons_and_historical_versions(tmp_path: Path) -> None:
             world="reported",
             valid_from="2024-03-01T00:00:00Z",
         )
-        database.correct_claim(
+        call_upstream(
+            database,
+            "correct_claim",
             first.logical_id,
             supersedes_version_id=first.version_id,
             confidence=0.9,
@@ -302,7 +315,9 @@ def test_claims_are_not_graph_edges_or_cypher_visible(claim_graph) -> None:
 
 def test_literal_objects_are_distinct_from_entities(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
-        graph.graph.assert_claim(
+        call_upstream(
+            graph.graph,
+            "assert_claim",
             subject="metric",
             predicate="VALUE",
             object=42,
@@ -400,7 +415,7 @@ def test_unknown_node_values_are_normalized(claim_graph) -> None:
         truncated=False,
     )
     tool = GestaltDBClaimExplanationTool(graph=graph)
-    with patch.object(graph.graph, "explain_claim", return_value=stub):
+    with patch.object(graph.graph.rules, "explain", return_value=stub):
         output = json.loads(tool.invoke({"claim_id": "claim:x", "valid_time": VALID_TIME}))
     assert output["nodes"] == [{"node_id": "n1", "kind": "other", "value": {"key": "value"}}]
 
@@ -447,7 +462,9 @@ def test_errors_are_redacted(claim_graph) -> None:
     invalid = search.invoke({"statement_id": "not-a-statement", "valid_time": VALID_TIME})
     assert "claim operation failed" in invalid
     assert "statement_id" not in invalid
-    with patch.object(graph.graph, "iter_claims_as_of", side_effect=RuntimeError("/secret/path")):
+    with patch.object(
+        graph.graph.epistemic, "iter_claims_as_of", side_effect=RuntimeError("/secret/path")
+    ):
         output = GestaltDBClaimStatusTool(graph=graph).invoke(
             {
                 "subject": "alice",
@@ -458,7 +475,7 @@ def test_errors_are_redacted(claim_graph) -> None:
         )
     assert "claim operation failed" in output
     assert "secret" not in output
-    with patch.object(graph.graph, "explain_claim", side_effect=RuntimeError("/secret/path")):
+    with patch.object(graph.graph.rules, "explain", side_effect=RuntimeError("/secret/path")):
         explanation = GestaltDBClaimExplanationTool(graph=graph).invoke(
             {"claim_id": "claim:x", "valid_time": VALID_TIME}
         )
@@ -481,8 +498,14 @@ def test_executable_offline_claim_example() -> None:
 def test_status_uses_one_resolution_and_caps_only_evidence(claim_graph) -> None:
     graph, _ = claim_graph
     with (
-        patch.object(graph.graph, "iter_claims_as_of", wraps=graph.graph.iter_claims_as_of) as read,
-        patch.object(graph.graph, "claim_status", side_effect=AssertionError("second resolution")),
+        patch.object(
+            graph.graph.epistemic,
+            "iter_claims_as_of",
+            wraps=graph.graph.epistemic.iter_claims_as_of,
+        ) as read,
+        patch.object(
+            graph.graph.epistemic, "claim_status", side_effect=AssertionError("second resolution")
+        ),
     ):
         output = json.loads(
             GestaltDBClaimStatusTool(graph=graph, max_evidence=1).invoke(
@@ -503,7 +526,9 @@ def test_status_uses_one_resolution_and_caps_only_evidence(claim_graph) -> None:
 def test_json_null_literal_status_and_search_limitation(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         for value in (None, 42):
-            graph.graph.assert_claim(
+            call_upstream(
+                graph.graph,
+                "assert_claim",
                 subject="metric",
                 predicate="VALUE",
                 object=value,

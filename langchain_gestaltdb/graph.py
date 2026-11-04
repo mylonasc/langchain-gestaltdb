@@ -104,7 +104,7 @@ class GestaltDBGraph:
         same database directory and identifies the source in read-view
         provenance. It is not a snapshot, ordering, or secrecy guarantee.
         """
-        return cast("str", self.graph.database_id)
+        return self.graph.database_id
 
     def index_statistics(self) -> dict[str, object]:
         """Return persisted property-index definitions visible to the planner.
@@ -115,7 +115,7 @@ class GestaltDBGraph:
         definitions, not freshness; consult :meth:`stale_indexes` for deferred
         families still requiring a rebuild.
         """
-        return cast("dict[str, object]", self.graph.index_statistics())
+        return self.graph.index_statistics()
 
     def stale_indexes(self) -> tuple[str, ...]:
         """Return sorted index families requiring a rebuild.
@@ -128,7 +128,7 @@ class GestaltDBGraph:
         stale secondary indexes, but indexed lookups must not be trusted while
         their family is listed here.
         """
-        return cast("tuple[str, ...]", self.graph.stale_indexes())
+        return self.graph.stale_indexes()
 
     def query(
         self,

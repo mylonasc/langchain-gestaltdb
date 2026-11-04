@@ -48,23 +48,24 @@ without installing Community or Neo4j. This is not inheritance/chain compatibili
 
 ## Agent-backend tool map (G17 integration surface)
 
-Status key: **tree** ships on `integration/gestalt-agent-backend`; **runbook**
-has no agent tool by design and stays with the trusted application. The full
+Status key: every row below ships in `0.2.0` on `main` (developed as
+G17-01…G17-12 on `integration/gestalt-agent-backend`); **runbook** has no
+agent tool by design and stays with the trusted application. The full
 agent sequence is described in `docs/AGENT_WORKFLOW.md`; deployment limits live
 in `docs/LIMITS.md`.
 
 | Tool / helper | Module | Status | Notes |
 | --- | --- | --- | --- |
-| `call_upstream` / `service_layout` compat bridge | `langchain_gestaltdb._compat` | tree (G17-01) | facade-preferred, service-fallback; `explain_claim->rules.explain`, `run_rules->run`, `maintain_truth->maintain`; `open_read_view` / `evaluate_entailment` bridge `read_view` and the pinned-view `entails` signature |
-| Lifecycle inspection (`manifest`, `database_id`, `index_statistics`, `stale_indexes`) + `read_snapshot` / `read_view` semantics | `GestaltDBGraph` | tree (G17-02) | read-only passthroughs, fail closed when closed; `adapter.read_view(...)` works on both 0.12 and 0.17 layouts; LMDB snapshots verifiable, transactional PyRex pins, LevelDB/default PyRex reject explicit snapshots |
-| Read-only policy: `SHOW INDEX[ES]`/`SHOW CONSTRAINTS`, `kg.entails` world+validTime options | `_read_only` | tree (G17-03/04) | `CREATE/DROP CONSTRAINT` stays write-gated; temporal qualifiers make queries write-restricted |
-| `advise_index` / `GestaltDBIndexAdvisorTool` | `langchain_gestaltdb.index_advisor` | tree (G17-05) | read-only; opt-in via `GestaltDBToolkit(include_index_advisor=True)`; agents never run DDL |
-| `ingest_polars` / `ingest_arrow` | `GestaltDBGraph` | tree (G17-06) | trusted-app bulk helper, not an agent tool; `MAINTAIN`/`DEFER`/`DEFER_REBUILD`, chunked, no whole-import atomicity |
-| `GestaltDBSamplingTool` (`gestaltdb_sample_paths`) | `langchain_gestaltdb.sampling` | tree (G17-07) | ordered `SamplingPattern`, `paths`/`subgraph` modes, decoded IDs, deterministic order |
-| Temporal as-of tools (`gestaltdb_node_as_of`, `gestaltdb_edge_as_of`, `gestaltdb_temporal_scan`) | `langchain_gestaltdb.temporal_tools` | tree (G17-08) | read-only bounded versions at valid/system horizons; migration/orphan recovery stays a trusted-app runbook |
-| Rule read/write tools (`gestaltdb_rule_get/list/create/run/maintain`) | `langchain_gestaltdb.rules` | tree (G17-09) | get/list read-only; create/run/maintain opt-in via `GestaltDBRuleToolkit(allow_writes=True)` |
-| Modal entailment tools (`gestaltdb_entails`, `gestaltdb_world_accessibility_assert`) | `langchain_gestaltdb.modal` | tree (G17-10) | same bounded evaluator as `CALL kg.entails` with `world`+`validTime`; accessibility writes stay opt-in |
-| Visualization artifacts (`GestaltDBVizTool`, `render_artifact`) | `langchain_gestaltdb.viz` | tree (G17-11) | trusted app writes HTML/SVG to an explicit path; agent receives a bounded summary plus path |
+| `call_upstream` / `service_layout` compat bridge | `langchain_gestaltdb._compat` | 0.2.0 (G17-01) | facade-preferred, service-fallback; `explain_claim->rules.explain`, `run_rules->run`, `maintain_truth->maintain`; `open_read_view` / `evaluate_entailment` bridge `read_view` and the pinned-view `entails` signature |
+| Lifecycle inspection (`manifest`, `database_id`, `index_statistics`, `stale_indexes`) + `read_snapshot` / `read_view` semantics | `GestaltDBGraph` | 0.2.0 (G17-02) | read-only passthroughs, fail closed when closed; `adapter.read_view(...)` works on both facade and services layouts; LMDB snapshots verifiable, transactional PyRex pins, LevelDB/default PyRex reject explicit snapshots |
+| Read-only policy: `SHOW INDEX[ES]`/`SHOW CONSTRAINTS`, `kg.entails` world+validTime options | `_read_only` | 0.2.0 (G17-03/04) | `CREATE/DROP CONSTRAINT` stays write-gated; temporal qualifiers make queries write-restricted |
+| `advise_index` / `GestaltDBIndexAdvisorTool` | `langchain_gestaltdb.index_advisor` | 0.2.0 (G17-05) | read-only; opt-in via `GestaltDBToolkit(include_index_advisor=True)`; agents never run DDL |
+| `ingest_polars` / `ingest_arrow` | `GestaltDBGraph` | 0.2.0 (G17-06) | trusted-app bulk helper, not an agent tool; `MAINTAIN`/`DEFER`/`DEFER_REBUILD`, chunked, no whole-import atomicity |
+| `GestaltDBSamplingTool` (`gestaltdb_sample_paths`) | `langchain_gestaltdb.sampling` | 0.2.0 (G17-07) | ordered `SamplingPattern`, `paths`/`subgraph` modes, decoded IDs, deterministic order |
+| Temporal as-of tools (`gestaltdb_node_as_of`, `gestaltdb_edge_as_of`, `gestaltdb_temporal_scan`) | `langchain_gestaltdb.temporal_tools` | 0.2.0 (G17-08) | read-only bounded versions at valid/system horizons; migration/orphan recovery stays a trusted-app runbook |
+| Rule read/write tools (`gestaltdb_rule_get/list/create/run/maintain`) | `langchain_gestaltdb.rules` | 0.2.0 (G17-09) | get/list read-only; create/run/maintain opt-in via `GestaltDBRuleToolkit(allow_writes=True)` |
+| Modal entailment tools (`gestaltdb_entails`, `gestaltdb_world_accessibility_assert`) | `langchain_gestaltdb.modal` | 0.2.0 (G17-10) | same bounded evaluator as `CALL kg.entails` with `world`+`validTime`; accessibility writes stay opt-in |
+| Visualization artifacts (`GestaltDBVizTool`, `render_artifact`) | `langchain_gestaltdb.viz` | 0.2.0 (G17-11) | trusted app writes HTML/SVG to an explicit path; agent receives a bounded summary plus path |
 
 ## Graph lifecycle and operations
 
@@ -85,7 +86,7 @@ in `docs/LIMITS.md`.
   families needing `graph.rebuild_deferred_indexes()`. All four pass through to the
   underlying handle and fail closed once the adapter is closed. No raw write
   transaction is exposed; pin several reads with `adapter.read_view(...)`
-  (temporal horizon; bridges 0.12 `read_view` and 0.17
+  (temporal horizon; bridges facade `read_view` and services
   `temporal.open_read_view`) or `adapter.graph.current_read_view()` (backend
   snapshot).
 - `query(query, params=None, read_snapshot=None)` permits upstream reads/writes;
@@ -98,8 +99,8 @@ in `docs/LIMITS.md`.
   recursively validates before execution. Query length <=10000, AST nesting <=32.
 - `read_view(valid_time=..., system_time=None, through_commit=None)` returns a
   context manager pinning repeated point-in-time reads to one temporal horizon.
-  It delegates to `GraphDB.read_view` on 0.12 and to
-  `temporal.open_read_view(graph, manifest=..., database_id=..., ...)` on 0.17,
+  It delegates to facade `GraphDB.read_view` where present and to
+  `temporal.open_read_view(graph, manifest=..., database_id=..., ...)` on services layouts,
   so the same adapter code works on both layouts. Backend snapshot and
   durability guarantees are unchanged.
 - `get_schema` / `get_structured_schema` are cached text/dictionary properties;

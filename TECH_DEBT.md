@@ -22,14 +22,17 @@ stay in `PROJECT_BOOTSTRAP_EPIC.md` instead.
 - Area: `pyproject.toml` scoped mypy override for `gestaltdb.*`.
 - A second narrow override skips NumPy's 3.12-syntax stubs when checking our
   Python 3.10 target. NumPy is only transitive and not part of our public API.
-- Impact: static checking cannot verify upstream method signatures.
-- Reason: GestaltDB 0.12.0 does not ship a typed package contract.
-- Interim approach: strict typing locally, real installed-release tests for
-  lifecycle, parameters, entities/temporal values and persistence. No global
+- Impact: static checking cannot fully verify upstream method signatures.
+- Reason: GestaltDB 0.12.0 shipped no typed package contract; 0.17.0 ships
+  partial typing (typed entities and service signatures, untyped store helpers).
+- Interim approach: strict typing locally, narrow `no-untyped-call` ignores at
+  the key-codec boundary (`retrievers.py`, `_schema.py`), typed helpers where
+  upstream signatures exist, and real installed-release tests for lifecycle,
+  parameters, entities/temporal values and persistence. No global
   missing-import or untyped-call suppression.
 - Owner: integration maintainers. Revisit on the next GestaltDB minor upgrade.
-- Exit: upstream typing or narrow maintained stubs adopted; remove the override
-  and pass strict mypy and integration tests.
+- Exit: upstream typing completes the store helpers; remove the boundary
+  ignores and pass strict mypy and integration tests.
 - Introducing PR: [PR #17](https://github.com/mylonasc/langchain-gestaltdb/pull/17),
   NumPy-stub follow-up in [PR #19](https://github.com/mylonasc/langchain-gestaltdb/pull/19).
 

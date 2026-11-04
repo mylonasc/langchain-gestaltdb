@@ -16,6 +16,7 @@ from langchain_gestaltdb import (
     GestaltDBTemporalScanTool,
     GestaltDBTemporalToolkit,
 )
+from langchain_gestaltdb._compat import call_upstream
 
 T0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
 T1 = datetime(2024, 6, 1, tzinfo=timezone.utc)
@@ -30,15 +31,21 @@ def _iso(moment: datetime) -> str:
 def history_graph(tmp_path: Path) -> Iterator[GestaltDBGraph]:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         database = graph.graph
-        database.put_node_version(
+        call_upstream(
+            database,
+            "put_node_version",
             Node(node_id="alice", properties={"name": "Alice"}, labels=["Person"]),
             valid=(T0, T1),
         )
-        database.put_node_version(
+        call_upstream(
+            database,
+            "put_node_version",
             Node(node_id="bob", properties={"name": "Bob"}, labels=["Person"]),
             valid=(T0, None),
         )
-        database.put_edge_version(
+        call_upstream(
+            database,
+            "put_edge_version",
             Edge(edge_id="e1", source="alice", target="bob", properties={"type": "KNOWS"}),
             valid=(T0, None),
         )
@@ -88,11 +95,17 @@ def test_edge_as_of_reports_endpoints(history_graph: GestaltDBGraph) -> None:
 def test_system_horizon_pins_history(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         database = graph.graph
-        first = database.put_node_version(
-            Node(node_id="alice", properties={"role": "dev"}), valid=(T0, None)
+        first = call_upstream(
+            database,
+            "put_node_version",
+            Node(node_id="alice", properties={"role": "dev"}),
+            valid=(T0, None),
         )
-        database.put_node_version(
-            Node(node_id="alice", properties={"role": "lead"}), valid=(T0, None)
+        call_upstream(
+            database,
+            "put_node_version",
+            Node(node_id="alice", properties={"role": "lead"}),
+            valid=(T0, None),
         )
         tool = GestaltDBNodeAsOfTool(graph=graph)
         latest = json.loads(tool.invoke({"logical_id": "alice", "valid_time": _iso(T1)}))
@@ -133,7 +146,9 @@ def test_stale_temporal_fails_closed_with_rebuild_hint(tmp_path: Path) -> None:
     with GestaltDBGraph.create(tmp_path / "g", backend="lmdb") as graph:
         database = graph.graph
         if defer is not None:
-            database.put_node_version(
+            call_upstream(
+                database,
+                "put_node_version",
                 Node(node_id="alice", properties={"name": "Alice"}),
                 valid=(T0, None),
                 index_mode=defer,
@@ -143,7 +158,7 @@ def test_stale_temporal_fails_closed_with_rebuild_hint(tmp_path: Path) -> None:
             failing = RuntimeError("stale indexes require rebuild before query: temporal")
         tool = GestaltDBNodeAsOfTool(graph=graph)
         if failing is not None:
-            with patch.object(database, "get_node_as_of", side_effect=failing):
+            with patch.object(database.temporal, "get_node_as_of", side_effect=failing):
                 output = tool.invoke({"logical_id": "alice", "valid_time": _iso(T0)})
         else:
             output = tool.invoke({"logical_id": "alice", "valid_time": _iso(T0)})
@@ -151,7 +166,7 @@ def test_stale_temporal_fails_closed_with_rebuild_hint(tmp_path: Path) -> None:
         assert "rebuild_deferred_indexes" in output
         assert "never rebuild automatically" in output
 
-        database.rebuild_temporal_indexes()
+        call_upstream(database, "rebuild_temporal_indexes")
         recovered = json.loads(tool.invoke({"logical_id": "alice", "valid_time": _iso(T0)}))
         assert recovered["found"] is True
 
@@ -207,13 +222,17 @@ def test_read_view_pins_repeated_reads(history_graph: GestaltDBGraph) -> None:
 
 def test_errors_are_redacted(history_graph: GestaltDBGraph) -> None:
     database = history_graph.graph
-    with patch.object(database, "get_node_as_of", side_effect=RuntimeError("/secret/path")):
+    with patch.object(
+        database.temporal, "get_node_as_of", side_effect=RuntimeError("/secret/path")
+    ):
         output = GestaltDBNodeAsOfTool(graph=history_graph).invoke(
             {"logical_id": "alice", "valid_time": _iso(T0)}
         )
     assert "temporal read failed" in output
     assert "secret" not in output
-    with patch.object(database, "iter_nodes_as_of", side_effect=RuntimeError("/secret/path")):
+    with patch.object(
+        database.temporal, "iter_nodes_as_of", side_effect=RuntimeError("/secret/path")
+    ):
         scanned = GestaltDBTemporalScanTool(graph=history_graph).invoke(
             {"kind": "node", "valid_time": _iso(T0)}
         )

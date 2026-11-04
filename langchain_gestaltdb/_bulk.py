@@ -42,7 +42,7 @@ def normalize_index_mode(index_mode: Any) -> Any:
     try:
         from gestaltdb import IndexMaintenanceMode
     except ImportError:  # pragma: no cover - pinned upstream always exposes it
-        IndexMaintenanceMode = None
+        IndexMaintenanceMode = None  # type: ignore[assignment, misc]
     if IndexMaintenanceMode is not None and isinstance(index_mode, IndexMaintenanceMode):
         return index_mode
     if isinstance(index_mode, str) and index_mode.lower() in _INDEX_MODES:

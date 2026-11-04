@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.0] - 2026-11-04
+
+Requires `gestaltdb>=0.17.0,<0.18` (services layout: `epistemic` / `temporal` /
+`rules`). The 0.12 facade layout is no longer on the dependency line; the
+compat bridge keeps facade-first resolution for mixed call sites.
+
+- Full agent backend: bitemporal Cypher reads (`FOR VALID_TIME` /
+  `FOR SYSTEM_TIME`, version functions, `SHOW INDEXES` / `SHOW CONSTRAINTS`,
+  write-restricted temporal queries), schema/index advice, Arrow/Polars bulk
+  ingestion, bounded sampling, read-only temporal as-of tools with pinned
+  `read_view` horizons, Horn-rule read/write tools, bounded modal entailment
+  with opt-in accessibility writes, and offline visualization artifacts.
+- Read-only claim/status/search/explanation tools plus opt-in append-only
+  assert/correct/retract tools with validated provenance/validity and bounded
+  commit receipts; claims stay separate from Cypher-visible graph edges.
+- Tested on Python 3.10–3.13 with minimum/latest direct dependencies,
+  installed wheels, LMDB, LevelDB and PyRex contracts, and offline examples.
+  Strict mypy adopts the partial typing 0.17 ships, with narrow boundary
+  ignores where store helpers remain untyped (TD-01).
+- Backend guarantees vary; no universal atomicity/snapshot, native async,
+  native vector store or computational timeout is claimed. Read-only tools are
+  not a multitenant sandbox. See `docs/API.md` and `TECH_DEBT.md` before
+  deployment.
+
 ## [0.1.1] - 2026-10-18
 
 - Install `pyrex-rocksdb` by default through `gestaltdb[rocksdb]` and default

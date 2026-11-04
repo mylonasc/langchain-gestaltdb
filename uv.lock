@@ -348,7 +348,7 @@ wheels = [
 
 [[package]]
 name = "gestaltdb"
-version = "0.12.0"
+version = "0.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "lark" },
@@ -356,9 +356,9 @@ dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/13/e7/18bca6274820a8d47cf7f335bcd5b3ccbb89b630cd9be361d95eca9ed327/gestaltdb-0.12.0.tar.gz", hash = "sha256:0984ded5267bb7ef6e03c99070390254c188fef947985c1fdf424d86c5fa43dd", size = 424212, upload-time = "2026-10-18T11:15:06.726Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0d/03/f8b3afcfca98123aa81b8260b6437865b6d08d7782bf3f4e743eca3a315d/gestaltdb-0.17.0.tar.gz", hash = "sha256:dae7a83aaef900115cb753a3630bd83139326c4f2d6950a833aecbd904118c2a", size = 1019342, upload-time = "2026-11-02T20:30:24.192Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/0f/1e16a641b65cecf6b604607de6aaf8828f057fe670a4de059d8987bb326e/gestaltdb-0.12.0-py3-none-any.whl", hash = "sha256:c46b41bd5bbbc4c385a6351a21c9f7ccac6226abbf6f557922a6d0ffe64152c0", size = 342318, upload-time = "2026-10-18T11:15:04.974Z" },
+    { url = "https://files.pythonhosted.org/packages/39/83/9a64a0c192af8f53241dbd9d1dbd37555f01120a34fbff0ae5ac0510e95b/gestaltdb-0.17.0-py3-none-any.whl", hash = "sha256:4318455781a5bb7efce1f5df97cc574b70ab0888f991b74d04e49c698fc865c0", size = 744748, upload-time = "2026-11-02T20:30:21.908Z" },
 ]
 
 [package.optional-dependencies]
@@ -623,7 +623,7 @@ wheels = [
 
 [[package]]
 name = "langchain-gestaltdb"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "gestaltdb", extra = ["rocksdb"] },
@@ -654,10 +654,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "gestaltdb", extras = ["leveldb"], marker = "extra == 'leveldb'", specifier = ">=0.12.0,<0.13" },
-    { name = "gestaltdb", extras = ["lmdb"], marker = "extra == 'lmdb'", specifier = ">=0.12.0,<0.13" },
-    { name = "gestaltdb", extras = ["rocksdb"], specifier = ">=0.12.0,<0.13" },
-    { name = "gestaltdb", extras = ["rocksdb"], marker = "extra == 'rocksdb'", specifier = ">=0.12.0,<0.13" },
+    { name = "gestaltdb", extras = ["leveldb"], marker = "extra == 'leveldb'", specifier = ">=0.17.0,<0.18" },
+    { name = "gestaltdb", extras = ["lmdb"], marker = "extra == 'lmdb'", specifier = ">=0.17.0,<0.18" },
+    { name = "gestaltdb", extras = ["rocksdb"], specifier = ">=0.17.0,<0.18" },
+    { name = "gestaltdb", extras = ["rocksdb"], marker = "extra == 'rocksdb'", specifier = ">=0.17.0,<0.18" },
     { name = "langchain-core", specifier = ">=1.0,<2" },
     { name = "pydantic", specifier = ">=2.7,<3" },
 ]
@@ -1523,29 +1523,29 @@ wheels = [
 
 [[package]]
 name = "pyrex-rocksdb"
-version = "0.4.1"
+version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2d/50/5627ea91e7ffa0b436d5e6ebf73ce5acc39cf792979dfe980b20c7fd82ff/pyrex_rocksdb-0.4.1-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:712da3cf0f51a82ff190a5081dca71bb25e45a0680d6b1e1176546cdd9275110", size = 3689086, upload-time = "2026-08-16T14:19:10.572Z" },
-    { url = "https://files.pythonhosted.org/packages/6c/77/589cd5db5c419b6a31a69e2b789b315f03947c13900d93cb18de550fe014/pyrex_rocksdb-0.4.1-cp310-cp310-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:cc203ea268a15bd7b02e802119bd49cfbf07b23b37494853aad42431df6c6ec3", size = 4458540, upload-time = "2026-08-16T14:19:12.678Z" },
-    { url = "https://files.pythonhosted.org/packages/f9/4a/8ba74093f2fe2e7738b85a5b725f10de19f5418e2587ffff4b1cc5bd8b8f/pyrex_rocksdb-0.4.1-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c90476dd70fc84ab36c433c61c82437680dd0281fffea68ee29335649e157ec0", size = 14848739, upload-time = "2026-08-16T14:19:14.254Z" },
-    { url = "https://files.pythonhosted.org/packages/00/ac/82e9d12db100bf1a22bda88b3ab550f682e6ba0821c360def53d3b1e307d/pyrex_rocksdb-0.4.1-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:e4daa2f0356a461cbca7269628a9747d7bf147854d514726f8cb2774c4b8d6ec", size = 6801649, upload-time = "2026-08-16T14:19:16.28Z" },
-    { url = "https://files.pythonhosted.org/packages/5a/78/826fb22e57749e78e554e38e1191ea05a3e3727d3958f0a1d02658ca25a4/pyrex_rocksdb-0.4.1-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:04aa6dad6c37ecf814996de371ac3a6fa43841d1949fdc371202c8c9a5d418fe", size = 16052560, upload-time = "2026-08-16T14:19:17.885Z" },
-    { url = "https://files.pythonhosted.org/packages/c6/87/664c3e5d2cb5f78fd72bfebe8f9d75db36bbea7e3017fd4c9d61316b1dcf/pyrex_rocksdb-0.4.1-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:ee129d246c42a61e4567d6393eaa78d550b9c5f981c99e447481a23766428c2f", size = 3689497, upload-time = "2026-08-16T14:19:19.927Z" },
-    { url = "https://files.pythonhosted.org/packages/8f/2d/703609b74578d80960f266071a0831a900ef5b7e74e3bf3d7027981f25b2/pyrex_rocksdb-0.4.1-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3e4aa5224735e79327776bcc157bac66cd74fed29ddfe987c29072cbb9e26b42", size = 4461594, upload-time = "2026-08-16T14:19:21.354Z" },
-    { url = "https://files.pythonhosted.org/packages/57/46/f1143f91bb1858e38a3d461bebfed14b7732ce79c14831456d274b7e26a1/pyrex_rocksdb-0.4.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6ef27b286c70d063a0330b5e7e125123359fb7f06137b12cc9b82160f49bd052", size = 14907880, upload-time = "2026-08-16T14:19:22.852Z" },
-    { url = "https://files.pythonhosted.org/packages/9f/0f/3f8cbfb86396122835dd6d86348dda39bb0375dde0172caf491a7a61a937/pyrex_rocksdb-0.4.1-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:d2839fc97a1d23bd9474ed39b3a30a2f64dff0caa133b33ad0ebbcd7801887df", size = 6805554, upload-time = "2026-08-16T14:19:24.893Z" },
-    { url = "https://files.pythonhosted.org/packages/42/b1/49fb77eaa1131d20f6037092d885375a374cc58f80539a8e8f7edec9ca72/pyrex_rocksdb-0.4.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:26c27b7eff236bebbd31fba1cd47922526c11fd755a7bf13f398bba1581171cb", size = 16127731, upload-time = "2026-08-16T14:19:26.487Z" },
-    { url = "https://files.pythonhosted.org/packages/21/c4/85fe58cb0ca000bc451bd205a137912f2399c92947ce796bd287be932717/pyrex_rocksdb-0.4.1-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:e226e4df7753426121f0ceb9dc836dec069dd5d4843d8790bfc3776dbe5b1211", size = 3692106, upload-time = "2026-08-16T14:19:28.438Z" },
-    { url = "https://files.pythonhosted.org/packages/1a/0b/76a3cb3fabfe4b8aad4a3336ca0b795807a2779b30742a000e2a5193d87e/pyrex_rocksdb-0.4.1-cp312-cp312-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f84bacce9de1830d68a1462b04e6763f5a2f7d141279ae93af7514d6e16069e8", size = 4461907, upload-time = "2026-08-16T14:19:30.547Z" },
-    { url = "https://files.pythonhosted.org/packages/02/b2/4ea4cf55bc977103a404e90dc01b03c91c88764a159d13b38b0d2238b4ab/pyrex_rocksdb-0.4.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:aa0090fdb2a0b19cbd8f90c5a2cb18f3a71104fdf11533e72b9f5f524346b192", size = 15015199, upload-time = "2026-08-16T14:19:32.499Z" },
-    { url = "https://files.pythonhosted.org/packages/d2/93/0c73d6b677de9c224179959ed0d5de77e2373413feff08b354a23aa7ba28/pyrex_rocksdb-0.4.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:8b0d2b7936b9922a9044acd8c924b0199018d4dc0fb8096f724bb6ecd20d4670", size = 6806088, upload-time = "2026-08-16T14:19:34.353Z" },
-    { url = "https://files.pythonhosted.org/packages/b2/f9/7672f5d4cbc60cb4480892c7d77ef9361cb3b854c82e825e22474004e68b/pyrex_rocksdb-0.4.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:dbcb01f822b25f2adda9b00482d30f79cd0e8a9848f54634dd24424d3ad19126", size = 16248976, upload-time = "2026-08-16T14:19:36.046Z" },
-    { url = "https://files.pythonhosted.org/packages/0a/3e/6c41fbbf423549017c3595697ea6fc561fef4ba40cee8253814c764d85ad/pyrex_rocksdb-0.4.1-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:46eab7cb5642baa9a4197ebd8e92fa2c0d373fad4d76bdb127e8f14625207945", size = 3692019, upload-time = "2026-08-16T14:19:38.093Z" },
-    { url = "https://files.pythonhosted.org/packages/6b/cb/9fdd75ba7bb58a3491f41c202aa2cd36a2844643ffbe56bbee2066726181/pyrex_rocksdb-0.4.1-cp313-cp313-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:456a702ceeed52c9215c3647370df5463177724332fa3f1c9d34f1f4f5244edc", size = 4462482, upload-time = "2026-08-16T14:19:39.622Z" },
-    { url = "https://files.pythonhosted.org/packages/58/b7/32f06f147b953ffed0138db4d7b2b10219ea87d3222a1af88389f1c3e738/pyrex_rocksdb-0.4.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:cf5706a71dc36dc88fbcd74664a8495b27655cc504db3f4bfbc62a5e361ff3be", size = 15015202, upload-time = "2026-08-16T14:19:41.012Z" },
-    { url = "https://files.pythonhosted.org/packages/34/67/caf7a70272ce0607aa23903cdf05b4c7f424b77a565a244261c20550cff2/pyrex_rocksdb-0.4.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:f63b101aec7b653139296a45dac53fb03bc10b16134626e6991753dae35d1bc0", size = 6806512, upload-time = "2026-08-16T14:19:42.917Z" },
-    { url = "https://files.pythonhosted.org/packages/c0/96/155a686b21bc10400792c8e0d19b775250ce54b95d6ce6321afbb15e7759/pyrex_rocksdb-0.4.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:40b20e14a556aec89fac1a5b46edf449497219b5c9878a1ad8ee84c714f0c0b9", size = 16251155, upload-time = "2026-08-16T14:19:44.575Z" },
+    { url = "https://files.pythonhosted.org/packages/85/27/a5262658128348fd3b3c84f668b3a0737015be0cfc235d49bc37e1bb9f1b/pyrex_rocksdb-0.7.1-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:34ab4fc6c7edad26a918db55e1e0cab7c8ddf24e0962283270abde28261538eb", size = 3868630, upload-time = "2026-10-31T14:37:18.543Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/8c/0a6acbd241797b697f14787d3b46ee12c081b85732e2c3e84b478539a2bc/pyrex_rocksdb-0.7.1-cp310-cp310-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ef04310b461f8fa9421a80229a4a50a7dd37142f5a34717d0c740b662af4a5b7", size = 4644625, upload-time = "2026-10-31T14:37:20.652Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/4f/17c259950222cbb509d51751cd644e5cf757142daa44aceda58b2aac0bbc/pyrex_rocksdb-0.7.1-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3ade0ebf40162ea9b0f55d157991f5577d260589bdaf00dfbfb0b9cdf284d0e3", size = 17522830, upload-time = "2026-10-31T14:37:22.592Z" },
+    { url = "https://files.pythonhosted.org/packages/02/7b/aa62334c9ce6cef22e5e3173323090a1c40b6dfaa969eb1b45b78dfdb9b7/pyrex_rocksdb-0.7.1-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:c762cde964c6b8f4b79e6807b839c88e110d0ad7dd902bdd5827ff13ac63d69c", size = 6994126, upload-time = "2026-10-31T14:37:24.731Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/79/a9c5bd860833684f3ef7d6ac5153ea6375c8725485a75c15077a0397dbb1/pyrex_rocksdb-0.7.1-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:9e6ec779025592750670b68ece9c28c34b278d7f3a1d3ef83dd283a712a4f6f2", size = 18643189, upload-time = "2026-10-31T14:37:26.436Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/40/1afa083d81664c2d680449cfa5d093c4c85e8cc6cf969f1af4c20b71aa6d/pyrex_rocksdb-0.7.1-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:65823502b41433ca4cc057b25cedfee64951ba7698b0f0ed69297ab11626426f", size = 3870758, upload-time = "2026-10-31T14:37:28.633Z" },
+    { url = "https://files.pythonhosted.org/packages/49/e4/563b50349eb0ba10ad14d7ab42acdd58d1abff2bafa99058093b953f377f/pyrex_rocksdb-0.7.1-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:6a043833584e600258dbce649c698608a76e8ccc2d3000d30914ef964212e3f1", size = 4648945, upload-time = "2026-10-31T14:37:30.386Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/a4/c877e8b27a14e0522e33f5cab923d1be4348ab1190cb202c06bfc1095f9b/pyrex_rocksdb-0.7.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:7e52acc6a2dc89e9e596b1204d87cb841ac5c31209e67574f554321b191a21a1", size = 17608484, upload-time = "2026-10-31T14:37:32.522Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/b9/6049c6582a8d2bff0e5a36cafb3d2dfb4024da96f3c826d8825255b11e00/pyrex_rocksdb-0.7.1-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:0f58cc36f2f68e6c4f89156e448884943f101bcbbb268fc4e12815299f0f6e72", size = 6996821, upload-time = "2026-10-31T14:37:34.98Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/61/028f4a1b914c9eb3a619b324d7668c6e98bd216f9425a7db6846617044bf/pyrex_rocksdb-0.7.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:85d8c76cd34735fb57f308a1f8cf4abcb0326e16813afc328bc02f8a53eefe1e", size = 18742702, upload-time = "2026-10-31T14:37:36.958Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/ff/498a8966e1eecdecdc1a65bfdd0c67d9c2996b91f8f08c2f581b9e89b3e2/pyrex_rocksdb-0.7.1-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:a979b43e122ec6a6f697dfe2f435ba9d466fc5404f150710c2ac5da0b581e6c5", size = 3878172, upload-time = "2026-10-31T14:37:39.228Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/88/5491fdd5814029ad70bb6425e0c57fb4b18bef50ee424dd8a668c319fbd9/pyrex_rocksdb-0.7.1-cp312-cp312-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ece44d3665032016f1992816e31ca5b8181e451a17f35a4d507ff32d109ddf6c", size = 4649151, upload-time = "2026-10-31T14:37:41.015Z" },
+    { url = "https://files.pythonhosted.org/packages/78/22/9a6c2dcf829a46a4fc10a072e42f78da70f0279065566915a63103cf7831/pyrex_rocksdb-0.7.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3a58b971e031c899a676874e1b5e7e9d4d6b798b93989d5f4f2f2f22446e96bc", size = 17785046, upload-time = "2026-10-31T14:37:42.776Z" },
+    { url = "https://files.pythonhosted.org/packages/00/95/d552682dc23df04a2004a99e461b395c2df3722217bee70b39995cc001ea/pyrex_rocksdb-0.7.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:8ca2dc85f9fd730073f22f60c830aec12a85d3d749da9dfe0501344a31e17224", size = 6998167, upload-time = "2026-10-31T14:37:45.643Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/3f/be116612f0be7cf763871733fe3c293c6c9bb7d0f80152ba672a78346f72/pyrex_rocksdb-0.7.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:0a8e3762b9ff436579721d054787a82ed1f3889ae6b8bb34747da795b2860c3e", size = 18927794, upload-time = "2026-10-31T14:37:47.709Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/0c/807c41ae28d66e843116bfa0fedad0fee6f602201290ddd0fcb6782f9834/pyrex_rocksdb-0.7.1-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:0465bf5af5e173734a88352b1fe8cc35ec53e8857372b5c92d7f8694bc42cc25", size = 3878087, upload-time = "2026-10-31T14:37:50.228Z" },
+    { url = "https://files.pythonhosted.org/packages/22/5e/0bc5ba1e6e2151141affe233df98e6cd518ea3a9508d9f53ad89e85742bb/pyrex_rocksdb-0.7.1-cp313-cp313-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9e08d8d0fff73d747be56606d7275d2002d7028bd2cc1c42cd802a670b4cbec6", size = 4649385, upload-time = "2026-10-31T14:37:51.893Z" },
+    { url = "https://files.pythonhosted.org/packages/da/41/b755aaa6ba999c63e602023b5530df2863a0a4cf3fae3d0eaaddf143baf4/pyrex_rocksdb-0.7.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:01e22f0332ef57b0ee8dec653da96f5842ec24ac25bf19e05fb0e93661b25aa3", size = 17784181, upload-time = "2026-10-31T14:37:54.118Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/6a/72074faf4d0857910da5384ed8aaf0980d8e24bbb2cb103e62ac50529836/pyrex_rocksdb-0.7.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:395cd63ae7dd5a5d7205184443f8e804445e2262fae9d9b5c8b91064ed2edf33", size = 6998982, upload-time = "2026-10-31T14:37:56.615Z" },
+    { url = "https://files.pythonhosted.org/packages/23/bf/df1592783345b41f60458ebcd7628e0f2c9167060caac3e720381fb43c77/pyrex_rocksdb-0.7.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:fa82e95ce7cb1103da4e15eb223fd0e8c8df29731960ac268303b84ff79788cc", size = 18928066, upload-time = "2026-10-31T14:37:59.014Z" },
 ]
 
 [[package]]

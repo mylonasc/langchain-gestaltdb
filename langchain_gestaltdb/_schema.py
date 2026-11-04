@@ -60,9 +60,17 @@ def discover_schema(
     This is approximate discovery, not a concurrent database-wide snapshot.
     """
     node_keys = list(
-        islice(graph.get_node_keys_generator(), None if node_limit is None else node_limit + 1)
+        islice(
+            graph.get_node_keys_generator(),  # type: ignore[no-untyped-call]
+            None if node_limit is None else node_limit + 1,
+        )
     )
-    edge_keys = list(islice(graph.iter_edge_ids(), None if edge_limit is None else edge_limit + 1))
+    edge_keys = list(
+        islice(
+            graph.iter_edge_ids(),  # type: ignore[no-untyped-call]
+            None if edge_limit is None else edge_limit + 1,
+        )
+    )
     nodes_truncated = node_limit is not None and len(node_keys) > node_limit
     edges_truncated = edge_limit is not None and len(edge_keys) > edge_limit
     node_keys = node_keys[:node_limit]
@@ -77,6 +85,8 @@ def discover_schema(
             continue
         endpoints = []
         for endpoint in (edge.source, edge.target):
+            if endpoint is None:
+                raise ValueError(f"Edge {edge.get_id!r} is missing an endpoint")
             key = endpoint.encode("utf-8") if isinstance(endpoint, str) else endpoint.get_id_bytes
             if key not in nodes:
                 nodes[key] = graph.get_node(key)

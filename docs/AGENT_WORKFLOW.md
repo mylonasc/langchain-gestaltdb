@@ -6,7 +6,7 @@ Recommended agent sequence against a GestaltDB backend:
 schema -> index check -> query / sample / retrieve -> temporal / claim check -> explain
 ```
 
-Conventions below hold on the `integration/gestalt-agent-backend` surface.
+Conventions below hold for the 0.2.0 agent surface.
 Runbook-only items have no agent tool by design and stay with the trusted
 application. Upstream details are authoritative in the installed guides:
 
